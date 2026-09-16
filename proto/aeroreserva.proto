@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package aeroreserva.v1;
+
+// ==================== VUELOS ====================
+
+service FlightService {
+  rpc ListFlights (Empty) returns (FlightList);
+  rpc GetFlight (GetByIdRequest) returns (Flight);
+  rpc CheckAvailability (GetByIdRequest) returns (AvailabilityResponse);
+  rpc OccupySeat (GetByIdRequest) returns (Flight);
+  rpc ReleaseSeat (GetByIdRequest) returns (Flight);
+}
+
+message Flight {
+  string id = 1;
+  string flight_number = 2;
+  string origin = 3;
+  string destination = 4;
+  string departure_at = 5;
+  string arrival_at = 6;
+  int32 total_capacity = 7;
+  int32 available_seats = 8;
+}
+
+message FlightList {
+  repeated Flight flights = 1;
+}
+
+message AvailabilityResponse {
+  bool available = 1;
+  int32 available_seats = 2;
+}
+
+message GetByIdRequest {
+  string id = 1;
+}
+
+// ==================== PASAJEROS ====================
+
+service PassengerService {
+  rpc CreatePassenger (CreatePassengerRequest) returns (Passenger);
+  rpc GetPassenger (GetByIdRequest) returns (Passenger);
+}
+
+message Passenger {
+  string id = 1;
+  string document_type = 2;
+  string document_number = 3;
+  string full_name = 4;
+  string email = 5;
+}
+
+message CreatePassengerRequest {
+  string document_type = 1;
+  string document_number = 2;
+  string full_name = 3;
+  string email = 4;
+}
+
+// ==================== RESERVAS ====================
+
+service BookingService {
+  rpc CreateBooking (CreateBookingRequest) returns (Booking);
+  rpc GetBooking (GetByIdRequest) returns (Booking);
+  rpc ListBookings (Empty) returns (BookingList);
+  rpc CancelBooking (GetByIdRequest) returns (Booking);
+}
+
+enum BookingStatus {
+  BOOKING_STATUS_UNSPECIFIED = 0;
+  BOOKING_STATUS_CONFIRMED = 1;
+  BOOKING_STATUS_CANCELLED = 2;
+}
+
+message Booking {
+  string id = 1;
+  string booking_code = 2;
+  string passenger_id = 3;
+  string flight_id = 4;
+  string created_at = 5;
+  BookingStatus status = 6;
+}
+
+message CreateBookingRequest {
+  string passenger_id = 1;
+  string flight_id = 2;
+}
+
+message BookingList {
+  repeated Booking bookings = 1;
+}
+
+message Empty {}
