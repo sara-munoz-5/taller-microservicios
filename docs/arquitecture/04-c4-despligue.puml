@@ -1,0 +1,56 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+LAYOUT_LANDSCAPE()
+
+title Diagrama C4 de Despliegue — AeroReserva
+
+Person(passenger, "Pasajero", "Reserva vuelos.")
+Person(agent, "Agente de reservas", "Gestiona solicitudes.")
+
+Deployment_Node(docker_host, "Equipo de desarrollo o servidor", "Docker Engine", "Ejecuta AeroReserva.") {
+
+    Deployment_Node(web_container, "aeroreserva-web", "Contenedor Docker", "Puerto 4321.") {
+        Container(web, "Aplicación web y BFF", "Astro", "Interfaz y punto de entrada.")
+    }
+
+    Deployment_Node(booking_container, "aeroreserva-booking-service", "Contenedor Docker", "gRPC interno: 50053.") {
+        Container(booking, "Servicio de reservas", "Ruby on Rails + gRPC", "Coordina reservas.")
+    }
+
+    Deployment_Node(flight_container, "aeroreserva-flight-service", "Contenedor Docker", "gRPC interno: 50051.") {
+        Container(flight, "Servicio de vuelos", "Ruby on Rails + gRPC", "Gestiona vuelos y cupos.")
+    }
+
+    Deployment_Node(passenger_container, "aeroreserva-passenger-service", "Contenedor Docker", "gRPC interno: 50052.") {
+        Container(passenger_service, "Servicio de pasajeros", "Ruby on Rails + gRPC", "Gestiona pasajeros.")
+    }
+
+    Deployment_Node(cassandra_container, "aeroreserva-cassandra", "Contenedor Docker: Cassandra 5.0", "Puerto 9042.") {
+        ContainerDb(flight_data, "Keyspace de vuelos", "Cassandra / CQL", "Vuelos y cupos.")
+        ContainerDb(passenger_data, "Keyspace de pasajeros", "Cassandra / CQL", "Pasajeros.")
+        ContainerDb(booking_data, "Keyspace de reservas", "Cassandra / CQL", "Reservas.")
+    }
+}
+
+Lay_R(web, booking)
+Lay_D(booking, flight)
+Lay_D(flight, passenger_service)
+Lay_D(passenger_service, booking_data)
+
+Rel(passenger, web, "Usa la aplicación", "HTTP:4321")
+Rel(agent, web, "Usa la aplicación", "HTTP:4321")
+
+Rel(web, flight, "Consulta vuelos", "gRPC:50051")
+Rel(web, passenger_service, "Gestiona pasajeros", "gRPC:50052")
+Rel(web, booking, "Gestiona reservas", "gRPC:50053")
+
+Rel(booking, passenger_service, "Valida pasajero", "gRPC")
+Rel(booking, flight, "Valida y ocupa/libera cupo", "gRPC")
+
+Rel(flight, flight_data, "Lee y escribe", "CQL:9042")
+Rel(passenger_service, passenger_data, "Lee y escribe", "CQL:9042")
+Rel(booking, booking_data, "Lee y escribe", "CQL:9042")
+
+footer Deployment View: AeroReserva | Contenedores físicos ejecutados en Docker.
+@enduml

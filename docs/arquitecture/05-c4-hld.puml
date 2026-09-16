@@ -1,0 +1,55 @@
+@startuml
+left to right direction
+
+skinparam shadowing false
+skinparam roundcorner 18
+skinparam defaultFontName Arial
+skinparam ArrowColor #64748B
+skinparam ArrowFontColor #334155
+
+skinparam actor {
+    BackgroundColor #DCFCE7
+    BorderColor #15803D
+    FontColor #14532D
+}
+
+skinparam rectangle {
+    BackgroundColor #F8FAFC
+    BorderColor #2563EB
+    FontColor #1E3A8A
+}
+
+skinparam cloud {
+    BackgroundColor #F3E8FF
+    BorderColor #7C3AED
+    FontColor #581C87
+}
+
+title Mapa de alto nivel — AeroReserva
+
+actor "Pasajero" as passenger
+actor "Agente de reservas" as agent
+
+rectangle "AeroReserva\nPlataforma para gestionar\nreservas de vuelos" as aero #DBEAFE
+
+rectangle "Consulta de vuelos\n\nRutas, horarios\ny cupos disponibles" as flights #DCFCE7
+
+rectangle "Información de pasajeros\n\nRegistro y consulta\nde viajeros" as passengers #FEF3C7
+
+rectangle "Gestión de reservas\n\nCrear, confirmar,\nconsultar y cancelar" as bookings #FCE7F3
+
+cloud "Información de AeroReserva\n\nVuelos\nPasajeros\nReservas" as information
+
+passenger --> aero : Consulta y reserva
+agent --> aero : Atiende y gestiona
+
+aero --> flights : Permite conocer
+aero --> passengers : Permite registrar
+aero --> bookings : Permite administrar
+
+flights --> information : Usa información
+passengers --> information : Usa información
+bookings --> information : Actualiza información
+
+footer Vista de alto nivel: muestra el propósito y las capacidades principales de AeroReserva.
+@enduml

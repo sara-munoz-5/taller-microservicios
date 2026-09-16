@@ -1,0 +1,59 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!include FONTAWESOME/user.puml
+!include FONTAWESOME/laptop.puml
+!include FONTAWESOME/server.puml
+!include FONTAWESOME/database.puml
+
+LAYOUT_LEFT_RIGHT()
+
+AddElementTag("frontend", $bgColor="#2563EB", $fontColor="#FFFFFF", $borderColor="#1D4ED8", $legendText="Aplicación web / BFF")
+AddElementTag("service", $bgColor="#0F766E", $fontColor="#FFFFFF", $borderColor="#115E59", $legendText="Microservicio backend")
+AddElementTag("data", $bgColor="#7C3AED", $fontColor="#FFFFFF", $borderColor="#6D28D9", $legendText="Almacén de datos")
+
+title Diagrama C4 de Contenedores — AeroReserva
+
+Person(passenger, "Pasajero", "Consulta vuelos y gestiona sus reservas.", $sprite="user")
+Person(agent, "Agente de reservas", "Gestiona solicitudes de pasajeros.", $sprite="user")
+
+System_Boundary(aeroreserva, "AeroReserva") {
+    Container(web, "Aplicación web y BFF", "Astro", "Interfaz web y punto de entrada.", $sprite="laptop", $tags="frontend")
+
+    Container(flight, "Servicio de vuelos", "Ruby on Rails + gRPC", "Vuelos, disponibilidad y cupos.", $sprite="server", $tags="service")
+    Container(passenger_service, "Servicio de pasajeros", "Ruby on Rails + gRPC", "Registro y validación de pasajeros.", $sprite="server", $tags="service")
+    Container(booking, "Servicio de reservas", "Ruby on Rails + gRPC", "Crea, consulta y cancela reservas.", $sprite="server", $tags="service")
+
+    ContainerDb(flight_data, "Keyspace de vuelos", "Cassandra", "Vuelos y cupos.", $sprite="database", $tags="data")
+    ContainerDb(passenger_data, "Keyspace de pasajeros", "Cassandra", "Datos de pasajeros.", $sprite="database", $tags="data")
+    ContainerDb(booking_data, "Keyspace de reservas", "Cassandra", "Datos de reservas.", $sprite="database", $tags="data")
+
+    Lay_Right(web, flight)
+    Lay_Right(flight, passenger_service)
+    Lay_Right(passenger_service, booking)
+
+    Lay_Down(flight, flight_data)
+    Lay_Down(passenger_service, passenger_data)
+    Lay_Down(booking, booking_data)
+}
+
+Lay_Down(passenger, agent)
+Lay_Right(passenger, web)
+
+Rel(passenger, web, "Usa la aplicación", "HTTPS síncrono")
+Rel(agent, web, "Usa la aplicación", "HTTPS síncrono")
+
+Rel(web, flight, "Consulta vuelos", "gRPC síncrono")
+Rel(web, passenger_service, "Registra y consulta pasajeros", "gRPC síncrono")
+Rel(web, booking, "Crea, consulta y cancela reservas", "gRPC síncrono")
+
+Rel(booking, passenger_service, "Valida pasajero", "gRPC síncrono")
+Rel(booking, flight, "Valida, ocupa y libera cupos", "gRPC síncrono")
+
+Rel(flight, flight_data, "Lee y escribe", "CQL síncrono")
+Rel(passenger_service, passenger_data, "Lee y escribe", "CQL síncrono")
+Rel(booking, booking_data, "Lee y escribe", "CQL síncrono")
+
+SHOW_LEGEND()
+@enduml

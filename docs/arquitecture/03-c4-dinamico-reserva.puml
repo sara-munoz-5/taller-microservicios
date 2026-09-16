@@ -1,0 +1,31 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title C4 dinámico — Flujo principal: crear una reserva
+
+Person(passenger, "Pasajero", "Solicita una reserva")
+
+Container(web, "Aplicación web y BFF", "Astro", "Interfaz y punto de entrada")
+Container(booking, "Servicio de reservas", "Ruby on Rails + gRPC", "Coordina la reserva")
+Container(passenger_service, "Servicio de pasajeros", "Ruby on Rails + gRPC", "Valida pasajeros")
+Container(flight, "Servicio de vuelos", "Ruby on Rails + gRPC", "Gestiona cupos")
+ContainerDb(booking_data, "Keyspace de reservas", "Cassandra / CQL", "Reservas")
+
+Rel(passenger, web, "1. Envía el pasajero y vuelo seleccionados", "HTTPS síncrono")
+Rel(web, booking, "2. Solicita crear la reserva", "gRPC síncrono")
+
+Rel(booking, passenger_service, "3. Valida que el pasajero exista", "gRPC síncrono")
+Rel(passenger_service, booking, "4. Confirma pasajero válido", "gRPC síncrono")
+
+Rel(booking, flight, "5. Consulta disponibilidad del vuelo", "gRPC síncrono")
+Rel(flight, booking, "6. Confirma cupo disponible", "gRPC síncrono")
+
+Rel(booking, flight, "7. Solicita ocupar un cupo", "gRPC síncrono")
+Rel(flight, booking, "8. Confirma cupo actualizado", "gRPC síncrono")
+
+Rel(booking, booking_data, "9. Guarda la reserva CONFIRMED", "CQL síncrono")
+Rel(booking, web, "10. Devuelve código y estado de reserva", "gRPC síncrono")
+Rel(web, passenger, "11. Muestra la confirmación", "HTTPS síncrono")
+
+footer Dynamic View: AeroReserva — Crear una reserva | Muestra la interacción entre contenedores para el caso de uso principal.
+@enduml
