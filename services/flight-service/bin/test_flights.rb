@@ -4,6 +4,9 @@ require "grpc"
 require "aeroreserva_pb"
 require "aeroreserva_services_pb"
 
+puts "Tipos disponibles en gRPC:"
+puts Aeroreserva::V1.constants.sort
+
 stub = Aeroreserva::V1::FlightService::Stub.new(
   "localhost:50051",
   :this_channel_is_insecure
@@ -12,5 +15,8 @@ stub = Aeroreserva::V1::FlightService::Stub.new(
 response = stub.list_flights(Aeroreserva::V1::Empty.new)
 
 response.flights.each do |flight|
-  puts "#{flight.flight_number}: #{flight.origin} -> #{flight.destination} | cupos: #{flight.available_seats}"
+  puts "ID: #{flight.id}"
+  puts "#{flight.flight_number}: #{flight.origin} -> #{flight.destination}"
+  puts "Cupos disponibles: #{flight.available_seats}"
+  puts "-" * 40
 end
