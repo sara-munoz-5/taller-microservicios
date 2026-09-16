@@ -1,0 +1,22 @@
+services:
+  cassandra:
+    image: cassandra:5.0
+    container_name: aeroreserva-cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: aeroreserva-cluster
+      CASSANDRA_NUM_TOKENS: 16
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 100M
+    ports:
+      - "9042:9042"
+    volumes:
+      - aeroreserva_cassandra_data:/var/lib/cassandra
+    networks:
+      - aeroreserva-network
+
+volumes:
+  aeroreserva_cassandra_data:
+
+networks:
+  aeroreserva-network:
+    driver: bridge
