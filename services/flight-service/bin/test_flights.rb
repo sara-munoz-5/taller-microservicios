@@ -4,8 +4,7 @@ require "grpc"
 require "aeroreserva_pb"
 require "aeroreserva_services_pb"
 
-puts "Tipos disponibles en gRPC:"
-puts Aeroreserva::V1.constants.sort
+
 
 stub = Aeroreserva::V1::FlightService::Stub.new(
   "localhost:50051",
