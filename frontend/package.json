@@ -18,5 +18,8 @@
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "devDependencies": {
+    "@astrojs/node": "^11.1.6"
   }
 }
