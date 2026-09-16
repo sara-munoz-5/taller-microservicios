@@ -40,3 +40,8 @@ group :development, :test do
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
 end
+
+gem "grpc", "~> 1.84"
+gem "grpc-tools", "~> 1.84"
+gem "cassandra-driver", "~> 3.2"
+gem "sorted_set", "~> 1.1"

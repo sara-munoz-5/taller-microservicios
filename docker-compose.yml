@@ -1,6 +1,6 @@
 services:
   cassandra:
-    image: cassandra:5.0
+    image: cassandra:4.0
     container_name: aeroreserva-cassandra
     environment:
       CASSANDRA_CLUSTER_NAME: aeroreserva-cluster
@@ -10,12 +10,12 @@ services:
     ports:
       - "9042:9042"
     volumes:
-      - aeroreserva_cassandra_data:/var/lib/cassandra
+      - aeroreserva_cassandra_4_data:/var/lib/cassandra
     networks:
       - aeroreserva-network
 
 volumes:
-  aeroreserva_cassandra_data:
+  aeroreserva_cassandra_4_data:
 
 networks:
   aeroreserva-network:
