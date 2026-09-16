@@ -1,0 +1,333 @@
+---
+const pageTitle = "AeroReserva | Vuelos disponibles";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="Consulta y reserva vuelos en AeroReserva." />
+    <title>{pageTitle}</title>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">Aero<span>Reserva</span></a>
+      <span class="tag">Reserva de vuelos</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">VIAJA CON TRANQUILIDAD</p>
+        <h1>Encuentra tu próximo vuelo</h1>
+        <p class="subtitle">
+          Consulta las rutas disponibles y sus cupos en tiempo real.
+        </p>
+      </section>
+
+      <section class="flights-section" aria-labelledby="flights-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">VUELOS DISPONIBLES</p>
+            <h2 id="flights-title">Elige una ruta</h2>
+          </div>
+          <span id="flight-count" class="count"></span>
+        </div>
+
+        <p id="loading-message" class="loading">Consultando vuelos disponibles…</p>
+        <p id="error-message" class="error" hidden></p>
+        <div id="flights-list" class="flights-grid"></div>
+      </section>
+    </main>
+
+    <footer>
+      AeroReserva · Taller de arquitectura de software
+    </footer>
+
+    <script>
+      const loadingMessage = document.querySelector("#loading-message");
+      const errorMessage = document.querySelector("#error-message");
+      const flightsList = document.querySelector("#flights-list");
+      const flightCount = document.querySelector("#flight-count");
+
+      function formatDate(dateValue) {
+        return new Intl.DateTimeFormat("es-CO", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(dateValue));
+      }
+
+      async function loadFlights() {
+        try {
+          const response = await fetch("/api/flights");
+
+          if (!response.ok) {
+            throw new Error("No fue posible obtener los vuelos.");
+          }
+
+          const flights = await response.json();
+
+          loadingMessage.hidden = true;
+          flightCount.textContent = `${flights.length} rutas`;
+
+          flightsList.innerHTML = flights.map((flight) => `
+            <article class="flight-card">
+              <div class="flight-card__top">
+                <span class="flight-number">${flight.flight_number}</span>
+                <span class="availability ${flight.available_seats > 0 ? "available" : "sold-out"}">
+                  ${flight.available_seats > 0 ? "Disponible" : "Sin cupos"}
+                </span>
+              </div>
+
+              <div class="route">
+                <strong>${flight.origin}</strong>
+                <span class="plane">✈</span>
+                <strong>${flight.destination}</strong>
+              </div>
+
+              <p class="departure">
+                Salida: ${formatDate(flight.departure_at)}
+              </p>
+
+              <div class="flight-card__bottom">
+                <span>${flight.available_seats} cupos disponibles</span>
+                <button type="button" ${flight.available_seats === 0 ? "disabled" : ""}>
+                  Seleccionar
+                </button>
+              </div>
+            </article>
+          `).join("");
+        } catch (error) {
+          loadingMessage.hidden = true;
+          errorMessage.hidden = false;
+          errorMessage.textContent =
+            "No pudimos consultar los vuelos. Verifica que Flight Service esté encendido.";
+        }
+      }
+
+      loadFlights();
+    </script>
+  </body>
+</html>
+
+<style>
+  :root {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    color: #17202a;
+    background: #f5f8fc;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem max(6vw, 1.5rem);
+    background: #ffffff;
+    border-bottom: 1px solid #e5ebf4;
+  }
+
+  .brand {
+    color: #152f63;
+    font-size: 1.35rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .brand span {
+    color: #ef6c4f;
+  }
+
+  .tag {
+    color: #667085;
+    font-size: 0.9rem;
+  }
+
+  main {
+    width: min(1100px, 88vw);
+    margin: 0 auto;
+  }
+
+  .hero {
+    padding: 5rem 0 3rem;
+    max-width: 640px;
+  }
+
+  .eyebrow {
+    margin: 0 0 0.6rem;
+    color: #ef6c4f;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+
+  h1, h2, p {
+    margin-top: 0;
+  }
+
+  h1 {
+    margin-bottom: 1rem;
+    color: #152f63;
+    font-size: clamp(2.3rem, 5vw, 4.2rem);
+    line-height: 1.05;
+  }
+
+  h2 {
+    margin-bottom: 0;
+    font-size: 1.8rem;
+  }
+
+  .subtitle {
+    color: #5b6677;
+    font-size: 1.1rem;
+    line-height: 1.6;
+  }
+
+  .flights-section {
+    padding-bottom: 5rem;
+  }
+
+  .section-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    margin-bottom: 1.5rem;
+  }
+
+  .count {
+    color: #667085;
+    font-size: 0.9rem;
+  }
+
+  .flights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.1rem;
+  }
+
+  .flight-card {
+    padding: 1.35rem;
+    background: #ffffff;
+    border: 1px solid #e5ebf4;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgb(26 42 71 / 6%);
+  }
+
+  .flight-card__top,
+  .flight-card__bottom,
+  .route {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .flight-number {
+    color: #152f63;
+    font-weight: 800;
+  }
+
+  .availability {
+    padding: 0.35rem 0.6rem;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .available {
+    color: #137333;
+    background: #e8f5e9;
+  }
+
+  .sold-out {
+    color: #b42318;
+    background: #fef3f2;
+  }
+
+  .route {
+    gap: 0.5rem;
+    margin: 1.8rem 0 1rem;
+    font-size: 1.1rem;
+  }
+
+  .plane {
+    color: #ef6c4f;
+    font-size: 1.3rem;
+  }
+
+  .departure {
+    min-height: 2.5rem;
+    color: #667085;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .flight-card__bottom {
+    padding-top: 1rem;
+    border-top: 1px solid #edf1f7;
+    color: #415166;
+    font-size: 0.85rem;
+  }
+
+  button {
+    padding: 0.6rem 0.85rem;
+    border: 0;
+    border-radius: 8px;
+    color: white;
+    background: #152f63;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .loading {
+    color: #667085;
+  }
+
+  .error {
+    padding: 1rem;
+    border-radius: 10px;
+    color: #b42318;
+    background: #fef3f2;
+  }
+
+  footer {
+    padding: 2rem;
+    color: #667085;
+    font-size: 0.85rem;
+    text-align: center;
+    background: #ffffff;
+    border-top: 1px solid #e5ebf4;
+  }
+
+  @media (max-width: 560px) {
+    .topbar {
+      padding: 1rem 1.25rem;
+    }
+
+    .tag {
+      display: none;
+    }
+
+    .hero {
+      padding-top: 3.5rem;
+    }
+
+    .section-heading {
+      align-items: start;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+  }
+</style>
