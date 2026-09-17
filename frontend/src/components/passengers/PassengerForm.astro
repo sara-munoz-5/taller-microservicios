@@ -1,0 +1,153 @@
+---
+---
+
+<form id="passenger-form" class="passenger-form">
+  <div class="field">
+    <label for="document_type">Tipo de documento</label>
+    <select id="document_type" name="document_type" required>
+      <option value="CC">Cédula de ciudadanía (CC)</option>
+      <option value="CE">Cédula de extranjería (CE)</option>
+      <option value="Pasaporte">Pasaporte</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="document_number">Número de documento</label>
+    <input
+      type="text"
+      id="document_number"
+      name="document_number"
+      autocomplete="off"
+      required
+    />
+  </div>
+
+  <div class="field">
+    <label for="full_name">Nombre completo</label>
+    <input type="text" id="full_name" name="full_name" autocomplete="name" required />
+  </div>
+
+  <div class="field">
+    <label for="email">Correo electrónico</label>
+    <input type="email" id="email" name="email" autocomplete="email" required />
+  </div>
+
+  <button type="submit">Registrar pasajero</button>
+
+  <p id="passenger-success" class="success" hidden></p>
+  <p id="passenger-error" class="error" hidden></p>
+</form>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>("#passenger-form");
+  const successMessage = document.querySelector<HTMLParagraphElement>("#passenger-success");
+  const errorMessage = document.querySelector<HTMLParagraphElement>("#passenger-error");
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    successMessage!.hidden = true;
+    errorMessage!.hidden = true;
+
+    const formData = new FormData(form);
+    const payload = {
+      document_type: formData.get("document_type"),
+      document_number: formData.get("document_number"),
+      full_name: formData.get("full_name"),
+      email: formData.get("email"),
+    };
+
+    try {
+      const response = await fetch("/api/passengers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "No fue posible registrar el pasajero.");
+      }
+
+      successMessage!.hidden = false;
+      successMessage!.textContent = `Pasajero registrado. ID: ${data.id}`;
+      form.reset();
+    } catch (error) {
+      errorMessage!.hidden = false;
+      errorMessage!.textContent =
+        error instanceof Error ? error.message : "No fue posible registrar el pasajero.";
+    }
+  });
+</script>
+
+<style>
+  .passenger-form {
+    display: grid;
+    gap: 1.1rem;
+    padding: 1.75rem;
+    background: #ffffff;
+    border: 1px solid #e5ebf4;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgb(26 42 71 / 6%);
+  }
+
+  .field {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  label {
+    color: #152f63;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  input,
+  select {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #e5ebf4;
+    border-radius: 8px;
+    color: #17202a;
+    font-size: 0.95rem;
+    font-family: inherit;
+    background: #f5f8fc;
+  }
+
+  input:focus,
+  select:focus {
+    outline: 2px solid #ef6c4f;
+    outline-offset: 1px;
+  }
+
+  button {
+    padding: 0.75rem 0.85rem;
+    border: 0;
+    border-radius: 8px;
+    color: white;
+    background: #152f63;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #0f2249;
+  }
+
+  .success {
+    padding: 1rem;
+    margin: 0;
+    border-radius: 10px;
+    color: #137333;
+    background: #e8f5e9;
+  }
+
+  .error {
+    padding: 1rem;
+    margin: 0;
+    border-radius: 10px;
+    color: #b42318;
+    background: #fef3f2;
+  }
+</style>
