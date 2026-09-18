@@ -34,6 +34,14 @@
 </div>
 
 <script>
+  import {
+    cancelBookingById,
+    fetchBookingById,
+    isConfirmedStatus,
+    toErrorMessage,
+    type Booking,
+  } from "./booking-api";
+
   const lookupForm = document.querySelector<HTMLFormElement>("#lookup-form");
   const bookingIdInput = document.querySelector<HTMLInputElement>("#booking_id");
   const cancelButton = document.querySelector<HTMLButtonElement>("#cancel-button");
@@ -46,7 +54,27 @@
   const successMessage = document.querySelector<HTMLParagraphElement>("#lookup-success");
   const errorMessage = document.querySelector<HTMLParagraphElement>("#lookup-error");
 
-  function renderBooking(booking: any) {
+  function readBookingId(): string | null {
+    const bookingId = bookingIdInput?.value.trim();
+    return bookingId ? bookingId : null;
+  }
+
+  function hideMessages() {
+    successMessage!.hidden = true;
+    errorMessage!.hidden = true;
+  }
+
+  function showSuccess(message: string) {
+    successMessage!.hidden = false;
+    successMessage!.textContent = message;
+  }
+
+  function showError(message: string) {
+    errorMessage!.hidden = false;
+    errorMessage!.textContent = message;
+  }
+
+  function renderBooking(booking: Booking) {
     details!.hidden = false;
     detailCode!.textContent = booking.booking_code;
     detailStatus!.textContent = booking.status;
@@ -54,61 +82,40 @@
     detailFlight!.textContent = booking.flight_id;
     detailCreated!.textContent = booking.created_at;
 
-    cancelButton!.disabled = booking.status !== "BOOKING_STATUS_CONFIRMED";
+    cancelButton!.disabled = !isConfirmedStatus(booking.status);
   }
 
-  lookupForm?.addEventListener("submit", async (event) => {
+  async function handleLookupSubmit(event: SubmitEvent) {
     event.preventDefault();
-
-    successMessage!.hidden = true;
-    errorMessage!.hidden = true;
+    hideMessages();
     details!.hidden = true;
 
-    const id = bookingIdInput?.value.trim();
-    if (!id) return;
+    const bookingId = readBookingId();
+    if (!bookingId) return;
 
     try {
-      const response = await fetch(`/api/bookings?id=${encodeURIComponent(id)}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "No fue posible consultar la reserva.");
-      }
-
-      renderBooking(data);
+      renderBooking(await fetchBookingById(bookingId));
     } catch (error) {
-      errorMessage!.hidden = false;
-      errorMessage!.textContent =
-        error instanceof Error ? error.message : "No fue posible consultar la reserva.";
+      showError(toErrorMessage(error, "No fue posible consultar la reserva."));
     }
-  });
+  }
 
-  cancelButton?.addEventListener("click", async () => {
-    successMessage!.hidden = true;
-    errorMessage!.hidden = true;
+  async function handleCancelClick() {
+    hideMessages();
 
-    const id = bookingIdInput?.value.trim();
-    if (!id) return;
+    const bookingId = readBookingId();
+    if (!bookingId) return;
 
     try {
-      const response = await fetch(`/api/bookings?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "No fue posible cancelar la reserva.");
-      }
-
-      renderBooking(data);
-      successMessage!.hidden = false;
-      successMessage!.textContent = "Reserva cancelada correctamente.";
+      renderBooking(await cancelBookingById(bookingId));
+      showSuccess("Reserva cancelada correctamente.");
     } catch (error) {
-      errorMessage!.hidden = false;
-      errorMessage!.textContent =
-        error instanceof Error ? error.message : "No fue posible cancelar la reserva.";
+      showError(toErrorMessage(error, "No fue posible cancelar la reserva."));
     }
-  });
+  }
+
+  lookupForm?.addEventListener("submit", handleLookupSubmit);
+  cancelButton?.addEventListener("click", handleCancelClick);
 </script>
 
 <style>

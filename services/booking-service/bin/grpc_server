@@ -1,0 +1,12 @@
+require_relative "../config/environment"
+require "grpc"
+require_relative "../lib/booking_service_impl"
+
+port = ENV.fetch("GRPC_PORT", "50053")
+
+server = GRPC::RpcServer.new
+server.add_http2_port("0.0.0.0:#{port}", :this_port_is_insecure)
+server.handle(BookingServiceImpl)
+
+puts "Servicio de reservas gRPC iniciado en el puerto #{port}"
+server.run_till_terminated

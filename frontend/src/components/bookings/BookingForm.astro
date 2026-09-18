@@ -23,85 +23,105 @@
 
   <button type="submit">Crear reserva</button>
 
-  <p id="booking-success" class="success" hidden></p>
+  <div id="booking-success-box" hidden>
+    <p id="booking-success" class="success"></p>
+    <p class="hint">
+      Usa el <strong>ID</strong> (no el código) en la sección "Mi reserva" para consultarla o cancelarla.
+    </p>
+  </div>
   <p id="booking-error" class="error" hidden></p>
 </form>
 
 <script>
+  import {
+    createBooking,
+    fetchAvailableFlights,
+    toErrorMessage,
+    type Booking,
+    type Flight,
+  } from "./booking-api";
+
   const form = document.querySelector<HTMLFormElement>("#booking-form");
   const flightSelect = document.querySelector<HTMLSelectElement>("#flight_id");
+  const successBox = document.querySelector<HTMLDivElement>("#booking-success-box");
   const successMessage = document.querySelector<HTMLParagraphElement>("#booking-success");
   const errorMessage = document.querySelector<HTMLParagraphElement>("#booking-error");
 
-  async function loadFlights() {
+  function renderFlightOptions(flights: Flight[]) {
     if (!flightSelect) return;
 
+    if (flights.length === 0) {
+      flightSelect.innerHTML = `<option value="" selected disabled>No hay vuelos con cupos</option>`;
+      return;
+    }
+
+    flightSelect.innerHTML = flights
+      .map(
+        (flight) => `
+          <option value="${flight.id}">
+            ${flight.flight_number}: ${flight.origin} → ${flight.destination} (${flight.available_seats} cupos)
+          </option>
+        `
+      )
+      .join("");
+  }
+
+  function renderFlightLoadError() {
+    if (!flightSelect) return;
+    flightSelect.innerHTML = `<option value="" selected disabled>No fue posible cargar los vuelos</option>`;
+  }
+
+  async function loadFlightOptions() {
     try {
-      const response = await fetch("/api/flights");
-
-      if (!response.ok) {
-        throw new Error("No fue posible obtener los vuelos.");
-      }
-
-      const flights = await response.json();
-      const withSeats = flights.filter((flight: any) => flight.available_seats > 0);
-
-      if (withSeats.length === 0) {
-        flightSelect.innerHTML = `<option value="" selected disabled>No hay vuelos con cupos</option>`;
-        return;
-      }
-
-      flightSelect.innerHTML = withSeats
-        .map(
-          (flight: any) => `
-            <option value="${flight.id}">
-              ${flight.flight_number}: ${flight.origin} → ${flight.destination} (${flight.available_seats} cupos)
-            </option>
-          `
-        )
-        .join("");
-    } catch (error) {
-      flightSelect.innerHTML = `<option value="" selected disabled>No fue posible cargar los vuelos</option>`;
+      renderFlightOptions(await fetchAvailableFlights());
+    } catch {
+      renderFlightLoadError();
     }
   }
 
-  form?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    successMessage!.hidden = true;
+  function hideMessages() {
+    successBox!.hidden = true;
     errorMessage!.hidden = true;
+  }
 
-    const formData = new FormData(form);
-    const payload = {
-      passenger_id: formData.get("passenger_id"),
-      flight_id: formData.get("flight_id"),
+  function showSuccess(booking: Booking) {
+    successBox!.hidden = false;
+    successMessage!.textContent =
+      `Reserva creada. Código: ${booking.booking_code} · Estado: ${booking.status} · ID: ${booking.id}`;
+  }
+
+  function showError(message: string) {
+    errorMessage!.hidden = false;
+    errorMessage!.textContent = message;
+  }
+
+  function readFormPayload(): { passengerId: string; flightId: string } {
+    const formData = new FormData(form!);
+    return {
+      passengerId: String(formData.get("passenger_id") ?? ""),
+      flightId: String(formData.get("flight_id") ?? ""),
     };
+  }
+
+  async function handleFormSubmit(event: SubmitEvent) {
+    event.preventDefault();
+    hideMessages();
+
+    const { passengerId, flightId } = readFormPayload();
 
     try {
-      const response = await fetch("/api/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "No fue posible crear la reserva.");
-      }
-
-      successMessage!.hidden = false;
-      successMessage!.textContent = `Reserva creada. Código: ${data.booking_code} · Estado: ${data.status}`;
-      form.reset();
-      await loadFlights();
+      const booking = await createBooking(passengerId, flightId);
+      showSuccess(booking);
+      form!.reset();
+      await loadFlightOptions();
     } catch (error) {
-      errorMessage!.hidden = false;
-      errorMessage!.textContent =
-        error instanceof Error ? error.message : "No fue posible crear la reserva.";
+      showError(toErrorMessage(error, "No fue posible crear la reserva."));
     }
-  });
+  }
 
-  loadFlights();
+  form?.addEventListener("submit", handleFormSubmit);
+
+  loadFlightOptions();
 </script>
 
 <style>
@@ -164,6 +184,12 @@
     border-radius: 10px;
     color: #137333;
     background: #e8f5e9;
+  }
+
+  .hint {
+    margin: 0.5rem 0 0;
+    color: #667085;
+    font-size: 0.8rem;
   }
 
   .error {
