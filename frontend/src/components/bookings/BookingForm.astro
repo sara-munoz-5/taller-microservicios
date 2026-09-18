@@ -1,0 +1,176 @@
+---
+---
+
+<form id="booking-form" class="booking-form">
+  <div class="field">
+    <label for="passenger_id">ID del pasajero</label>
+    <input
+      type="text"
+      id="passenger_id"
+      name="passenger_id"
+      placeholder="Obtenido al registrarte en /pasajeros"
+      autocomplete="off"
+      required
+    />
+  </div>
+
+  <div class="field">
+    <label for="flight_id">Vuelo</label>
+    <select id="flight_id" name="flight_id" required>
+      <option value="" selected disabled>Cargando vuelos…</option>
+    </select>
+  </div>
+
+  <button type="submit">Crear reserva</button>
+
+  <p id="booking-success" class="success" hidden></p>
+  <p id="booking-error" class="error" hidden></p>
+</form>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>("#booking-form");
+  const flightSelect = document.querySelector<HTMLSelectElement>("#flight_id");
+  const successMessage = document.querySelector<HTMLParagraphElement>("#booking-success");
+  const errorMessage = document.querySelector<HTMLParagraphElement>("#booking-error");
+
+  async function loadFlights() {
+    if (!flightSelect) return;
+
+    try {
+      const response = await fetch("/api/flights");
+
+      if (!response.ok) {
+        throw new Error("No fue posible obtener los vuelos.");
+      }
+
+      const flights = await response.json();
+      const withSeats = flights.filter((flight: any) => flight.available_seats > 0);
+
+      if (withSeats.length === 0) {
+        flightSelect.innerHTML = `<option value="" selected disabled>No hay vuelos con cupos</option>`;
+        return;
+      }
+
+      flightSelect.innerHTML = withSeats
+        .map(
+          (flight: any) => `
+            <option value="${flight.id}">
+              ${flight.flight_number}: ${flight.origin} → ${flight.destination} (${flight.available_seats} cupos)
+            </option>
+          `
+        )
+        .join("");
+    } catch (error) {
+      flightSelect.innerHTML = `<option value="" selected disabled>No fue posible cargar los vuelos</option>`;
+    }
+  }
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    successMessage!.hidden = true;
+    errorMessage!.hidden = true;
+
+    const formData = new FormData(form);
+    const payload = {
+      passenger_id: formData.get("passenger_id"),
+      flight_id: formData.get("flight_id"),
+    };
+
+    try {
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "No fue posible crear la reserva.");
+      }
+
+      successMessage!.hidden = false;
+      successMessage!.textContent = `Reserva creada. Código: ${data.booking_code} · Estado: ${data.status}`;
+      form.reset();
+      await loadFlights();
+    } catch (error) {
+      errorMessage!.hidden = false;
+      errorMessage!.textContent =
+        error instanceof Error ? error.message : "No fue posible crear la reserva.";
+    }
+  });
+
+  loadFlights();
+</script>
+
+<style>
+  .booking-form {
+    display: grid;
+    gap: 1.1rem;
+    padding: 1.75rem;
+    background: #ffffff;
+    border: 1px solid #e5ebf4;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgb(26 42 71 / 6%);
+  }
+
+  .field {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  label {
+    color: #152f63;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  input,
+  select {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #e5ebf4;
+    border-radius: 8px;
+    color: #17202a;
+    font-size: 0.95rem;
+    font-family: inherit;
+    background: #f5f8fc;
+  }
+
+  input:focus,
+  select:focus {
+    outline: 2px solid #ef6c4f;
+    outline-offset: 1px;
+  }
+
+  button {
+    padding: 0.75rem 0.85rem;
+    border: 0;
+    border-radius: 8px;
+    color: white;
+    background: #152f63;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #0f2249;
+  }
+
+  .success {
+    padding: 1rem;
+    margin: 0;
+    border-radius: 10px;
+    color: #137333;
+    background: #e8f5e9;
+  }
+
+  .error {
+    padding: 1rem;
+    margin: 0;
+    border-radius: 10px;
+    color: #b42318;
+    background: #fef3f2;
+  }
+</style>

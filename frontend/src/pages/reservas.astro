@@ -1,0 +1,181 @@
+---
+import BookingForm from "../components/bookings/BookingForm.astro";
+import BookingLookup from "../components/bookings/BookingLookup.astro";
+
+const pageTitle = "AeroReserva | Reservas";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="Crea y gestiona reservas en AeroReserva." />
+    <title>{pageTitle}</title>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">Aero<span>Reserva</span></a>
+      <span class="tag">Reservas</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">CONFIRMA TU VIAJE</p>
+        <h1>Gestiona tu reserva</h1>
+        <p class="subtitle">
+          Crea una reserva con el ID de tu pasajero y el vuelo elegido, o consulta y cancela una
+          reserva existente.
+        </p>
+      </section>
+
+      <div class="columns">
+        <section class="booking-section" aria-labelledby="booking-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">NUEVA RESERVA</p>
+              <h2 id="booking-title">Datos de la reserva</h2>
+            </div>
+          </div>
+
+          <BookingForm />
+        </section>
+
+        <section class="booking-section" aria-labelledby="lookup-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">CONSULTAR O CANCELAR</p>
+              <h2 id="lookup-title">Mi reserva</h2>
+            </div>
+          </div>
+
+          <BookingLookup />
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      AeroReserva · Taller de arquitectura de software
+    </footer>
+  </body>
+</html>
+
+<style>
+  :root {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    color: #17202a;
+    background: #f5f8fc;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem max(6vw, 1.5rem);
+    background: #ffffff;
+    border-bottom: 1px solid #e5ebf4;
+  }
+
+  .brand {
+    color: #152f63;
+    font-size: 1.35rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .brand span {
+    color: #ef6c4f;
+  }
+
+  .tag {
+    color: #667085;
+    font-size: 0.9rem;
+  }
+
+  main {
+    width: min(1100px, 88vw);
+    margin: 0 auto;
+  }
+
+  .hero {
+    padding: 5rem 0 3rem;
+    max-width: 640px;
+  }
+
+  .eyebrow {
+    margin: 0 0 0.6rem;
+    color: #ef6c4f;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+
+  h1, h2, p {
+    margin-top: 0;
+  }
+
+  h1 {
+    margin-bottom: 1rem;
+    color: #152f63;
+    font-size: clamp(2.3rem, 5vw, 4.2rem);
+    line-height: 1.05;
+  }
+
+  h2 {
+    margin-bottom: 0;
+    font-size: 1.8rem;
+  }
+
+  .subtitle {
+    color: #5b6677;
+    font-size: 1.1rem;
+    line-height: 1.6;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 2rem;
+    padding-bottom: 5rem;
+  }
+
+  .booking-section {
+    max-width: 480px;
+  }
+
+  .section-heading {
+    margin-bottom: 1.5rem;
+  }
+
+  footer {
+    padding: 2rem;
+    color: #667085;
+    font-size: 0.85rem;
+    text-align: center;
+    background: #ffffff;
+    border-top: 1px solid #e5ebf4;
+  }
+
+  @media (max-width: 560px) {
+    .topbar {
+      padding: 1rem 1.25rem;
+    }
+
+    .tag {
+      display: none;
+    }
+
+    .hero {
+      padding-top: 3.5rem;
+    }
+  }
+</style>

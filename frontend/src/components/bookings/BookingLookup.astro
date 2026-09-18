@@ -1,0 +1,219 @@
+---
+---
+
+<div class="booking-lookup">
+  <form id="lookup-form" class="lookup-form">
+    <div class="field">
+      <label for="booking_id">ID de la reserva</label>
+      <input
+        type="text"
+        id="booking_id"
+        name="booking_id"
+        placeholder="Código devuelto al crear la reserva"
+        autocomplete="off"
+        required
+      />
+    </div>
+
+    <div class="actions">
+      <button type="submit">Consultar reserva</button>
+      <button type="button" id="cancel-button" class="danger" disabled>Cancelar reserva</button>
+    </div>
+  </form>
+
+  <div id="booking-details" class="details" hidden>
+    <p><strong>Código:</strong> <span id="detail-code"></span></p>
+    <p><strong>Estado:</strong> <span id="detail-status"></span></p>
+    <p><strong>Pasajero:</strong> <span id="detail-passenger"></span></p>
+    <p><strong>Vuelo:</strong> <span id="detail-flight"></span></p>
+    <p><strong>Creada:</strong> <span id="detail-created"></span></p>
+  </div>
+
+  <p id="lookup-success" class="success" hidden></p>
+  <p id="lookup-error" class="error" hidden></p>
+</div>
+
+<script>
+  const lookupForm = document.querySelector<HTMLFormElement>("#lookup-form");
+  const bookingIdInput = document.querySelector<HTMLInputElement>("#booking_id");
+  const cancelButton = document.querySelector<HTMLButtonElement>("#cancel-button");
+  const details = document.querySelector<HTMLDivElement>("#booking-details");
+  const detailCode = document.querySelector<HTMLSpanElement>("#detail-code");
+  const detailStatus = document.querySelector<HTMLSpanElement>("#detail-status");
+  const detailPassenger = document.querySelector<HTMLSpanElement>("#detail-passenger");
+  const detailFlight = document.querySelector<HTMLSpanElement>("#detail-flight");
+  const detailCreated = document.querySelector<HTMLSpanElement>("#detail-created");
+  const successMessage = document.querySelector<HTMLParagraphElement>("#lookup-success");
+  const errorMessage = document.querySelector<HTMLParagraphElement>("#lookup-error");
+
+  function renderBooking(booking: any) {
+    details!.hidden = false;
+    detailCode!.textContent = booking.booking_code;
+    detailStatus!.textContent = booking.status;
+    detailPassenger!.textContent = booking.passenger_id;
+    detailFlight!.textContent = booking.flight_id;
+    detailCreated!.textContent = booking.created_at;
+
+    cancelButton!.disabled = booking.status !== "BOOKING_STATUS_CONFIRMED";
+  }
+
+  lookupForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    successMessage!.hidden = true;
+    errorMessage!.hidden = true;
+    details!.hidden = true;
+
+    const id = bookingIdInput?.value.trim();
+    if (!id) return;
+
+    try {
+      const response = await fetch(`/api/bookings?id=${encodeURIComponent(id)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "No fue posible consultar la reserva.");
+      }
+
+      renderBooking(data);
+    } catch (error) {
+      errorMessage!.hidden = false;
+      errorMessage!.textContent =
+        error instanceof Error ? error.message : "No fue posible consultar la reserva.";
+    }
+  });
+
+  cancelButton?.addEventListener("click", async () => {
+    successMessage!.hidden = true;
+    errorMessage!.hidden = true;
+
+    const id = bookingIdInput?.value.trim();
+    if (!id) return;
+
+    try {
+      const response = await fetch(`/api/bookings?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "No fue posible cancelar la reserva.");
+      }
+
+      renderBooking(data);
+      successMessage!.hidden = false;
+      successMessage!.textContent = "Reserva cancelada correctamente.";
+    } catch (error) {
+      errorMessage!.hidden = false;
+      errorMessage!.textContent =
+        error instanceof Error ? error.message : "No fue posible cancelar la reserva.";
+    }
+  });
+</script>
+
+<style>
+  .booking-lookup {
+    display: grid;
+    gap: 1.1rem;
+  }
+
+  .lookup-form {
+    display: grid;
+    gap: 1.1rem;
+    padding: 1.75rem;
+    background: #ffffff;
+    border: 1px solid #e5ebf4;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgb(26 42 71 / 6%);
+  }
+
+  .field {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  label {
+    color: #152f63;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  input {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #e5ebf4;
+    border-radius: 8px;
+    color: #17202a;
+    font-size: 0.95rem;
+    font-family: inherit;
+    background: #f5f8fc;
+  }
+
+  input:focus {
+    outline: 2px solid #ef6c4f;
+    outline-offset: 1px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  button {
+    padding: 0.75rem 0.85rem;
+    border: 0;
+    border-radius: 8px;
+    color: white;
+    background: #152f63;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #0f2249;
+  }
+
+  button.danger {
+    background: #b42318;
+  }
+
+  button.danger:hover {
+    background: #8f1b13;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .details {
+    display: grid;
+    gap: 0.4rem;
+    padding: 1.5rem 1.75rem;
+    background: #ffffff;
+    border: 1px solid #e5ebf4;
+    border-radius: 16px;
+  }
+
+  .details p {
+    margin: 0;
+    color: #415166;
+    font-size: 0.9rem;
+  }
+
+  .success {
+    padding: 1rem;
+    margin: 0;
+    border-radius: 10px;
+    color: #137333;
+    background: #e8f5e9;
+  }
+
+  .error {
+    padding: 1rem;
+    margin: 0;
+    border-radius: 10px;
+    color: #b42318;
+    background: #fef3f2;
+  }
+</style>
