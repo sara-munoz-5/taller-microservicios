@@ -1,4 +1,6 @@
 ---
+import GlobalNav from "../components/GlobalNav.astro";
+
 const pageTitle = "AeroReserva | Vuelos disponibles";
 ---
 
@@ -12,10 +14,7 @@ const pageTitle = "AeroReserva | Vuelos disponibles";
   </head>
 
   <body>
-    <header class="topbar">
-      <a class="brand" href="/">Aero<span>Reserva</span></a>
-      <span class="tag">Reserva de vuelos</span>
-    </header>
+    <GlobalNav current="flights" tag="Reserva de vuelos" />
 
     <main>
       <section class="hero">

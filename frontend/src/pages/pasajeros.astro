@@ -1,4 +1,5 @@
 ---
+import GlobalNav from "../components/GlobalNav.astro";
 import PassengerForm from "../components/passengers/PassengerForm.astro";
 
 const pageTitle = "AeroReserva | Registro de pasajeros";
@@ -14,10 +15,7 @@ const pageTitle = "AeroReserva | Registro de pasajeros";
   </head>
 
   <body>
-    <header class="topbar">
-      <a class="brand" href="/">Aero<span>Reserva</span></a>
-      <span class="tag">Registro de pasajeros</span>
-    </header>
+    <GlobalNav current="passengers" tag="Registro de pasajeros" />
 
     <main>
       <section class="hero">

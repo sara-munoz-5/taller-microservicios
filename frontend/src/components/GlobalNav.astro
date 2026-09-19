@@ -1,0 +1,116 @@
+---
+interface Props {
+  current?: "flights" | "passengers" | "bookings";
+  tag: string;
+}
+
+const { current, tag } = Astro.props;
+
+const links = [
+  { key: "flights", href: "/", label: "Vuelos" },
+  { key: "passengers", href: "/pasajeros", label: "Pasajeros" },
+  { key: "bookings", href: "/reservas", label: "Reservas" },
+] as const;
+---
+
+<header class="topbar">
+  <a class="brand" href="/" aria-label="AeroReserva, inicio">
+    Aero<span>Reserva</span>
+  </a>
+
+  <nav aria-label="Navegación principal">
+    {links.map((link) => (
+      <a
+        href={link.href}
+        class:list={{ active: current === link.key }}
+        aria-current={current === link.key ? "page" : undefined}
+      >
+        {link.label}
+      </a>
+    ))}
+  </nav>
+
+  <span class="tag">{tag}</span>
+</header>
+
+<style>
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1.2rem max(6vw, 1.5rem);
+    background: #ffffff;
+    border-bottom: 1px solid #e5ebf4;
+  }
+
+  .brand {
+    flex-shrink: 0;
+    color: #152f63;
+    font-size: 1.35rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .brand span {
+    color: #ef6c4f;
+  }
+
+  nav {
+    display: flex;
+    gap: 0.35rem;
+    margin-right: auto;
+  }
+
+  nav a {
+    padding: 0.55rem 0.8rem;
+    color: #667085;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  nav a:hover,
+  nav a:focus-visible {
+    color: #152f63;
+    background: #f1f5fb;
+  }
+
+  nav a.active {
+    color: #152f63;
+    background: #eef3fb;
+  }
+
+  .tag {
+    flex-shrink: 0;
+    color: #667085;
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 700px) {
+    .topbar {
+      flex-wrap: wrap;
+      gap: 0.75rem 1rem;
+      padding: 1rem 1.25rem;
+    }
+
+    nav {
+      order: 3;
+      flex-basis: 100%;
+      justify-content: space-between;
+      margin-right: 0;
+      border-top: 1px solid #e5ebf4;
+      padding-top: 0.75rem;
+    }
+
+    nav a {
+      flex: 1;
+      text-align: center;
+    }
+
+    .tag {
+      margin-left: auto;
+      font-size: 0.8rem;
+    }
+  }
+</style>

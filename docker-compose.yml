@@ -32,10 +32,50 @@ services:
       CASSANDRA_HOST: cassandra
       GRPC_PORT: 50051
     ports:
-      - "50051:50051"
+      - "50061:50051"
     depends_on:
       cassandra:
         condition: service_healthy
+    networks:
+      - aeroreserva-network
+
+  passenger-service:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        SERVICE: passenger-service
+    container_name: aeroreserva-passenger-service
+    environment:
+      RAILS_ENV: development
+      CASSANDRA_HOST: cassandra
+      GRPC_PORT: 50052
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - aeroreserva-network
+
+  booking-service:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        SERVICE: booking-service
+    container_name: aeroreserva-booking-service
+    environment:
+      RAILS_ENV: development
+      CASSANDRA_HOST: cassandra
+      GRPC_PORT: 50053
+      FLIGHT_SERVICE_ADDR: flight-service:50051
+      PASSENGER_SERVICE_ADDR: passenger-service:50052
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      flight-service:
+        condition: service_started
+      passenger-service:
+        condition: service_started
     networks:
       - aeroreserva-network
 
@@ -46,10 +86,16 @@ services:
     container_name: aeroreserva-web
     environment:
       FLIGHT_SERVICE_URL: flight-service:50051
+      PASSENGER_SERVICE_URL: passenger-service:50052
+      BOOKING_SERVICE_URL: booking-service:50053
     ports:
       - "4321:4321"
     depends_on:
       flight-service:
+        condition: service_started
+      passenger-service:
+        condition: service_started
+      booking-service:
         condition: service_started
     networks:
       - aeroreserva-network
