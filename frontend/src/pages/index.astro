@@ -1,6 +1,7 @@
----
+﻿---
 import GlobalNav from "../components/GlobalNav.astro";
 
+Astro.response.headers.set('Cache-Control', 'no-store');
 const pageTitle = "AeroReserva | Vuelos disponibles";
 ---
 
@@ -34,7 +35,12 @@ const pageTitle = "AeroReserva | Vuelos disponibles";
           <span id="flight-count" class="count"></span>
         </div>
 
-        <p id="loading-message" class="loading">Consultando vuelos disponibles…</p>
+        <div class="filters">
+  <label>Origen<select id="origin-filter"><option value="">Todos los orígenes</option></select></label>
+  <label>Destino<select id="destination-filter"><option value="">Todos los destinos</option></select></label>
+</div>
+<p id="empty-message" hidden>No hay vuelos para estos filtros.</p>
+<p id="loading-message" class="loading">Consultando vuelos disponibles…</p>
         <p id="error-message" class="error" hidden></p>
         <div id="flights-list" class="flights-grid"></div>
       </section>
@@ -45,6 +51,7 @@ const pageTitle = "AeroReserva | Vuelos disponibles";
     </footer>
 
     <script>
+      import { escapeHtml } from '../lib/browser';
       const loadingMessage = document.querySelector("#loading-message");
       const errorMessage = document.querySelector("#error-message");
       const flightsList = document.querySelector("#flights-list");
@@ -53,7 +60,7 @@ const pageTitle = "AeroReserva | Vuelos disponibles";
       function formatDate(dateValue) {
         return new Intl.DateTimeFormat("es-CO", {
           dateStyle: "medium",
-          timeStyle: "short",
+          timeStyle: "short", timeZone: "America/Bogota",
         }).format(new Date(dateValue));
       }
 
@@ -68,21 +75,31 @@ const pageTitle = "AeroReserva | Vuelos disponibles";
           const flights = await response.json();
 
           loadingMessage.hidden = true;
-          flightCount.textContent = `${flights.length} rutas`;
+          const origin = document.querySelector<HTMLSelectElement>('#origin-filter')!;
+          const destination = document.querySelector<HTMLSelectElement>('#destination-filter')!;
+          for (const [select, key] of [[origin, 'origin'], [destination, 'destination']] as const) {
+            for (const city of [...new Set<string>(flights.map((f: any) => f[key]))].sort()) {
+              select.add(new Option(city, city));
+            }
+          }
+          function renderFlights() {
+          const filtered = flights.filter((f: any) => (!origin.value || f.origin === origin.value) && (!destination.value || f.destination === destination.value));
+          flightCount.textContent = `${filtered.length} rutas`;
+          document.querySelector<HTMLElement>('#empty-message')!.hidden = filtered.length > 0;
 
-          flightsList.innerHTML = flights.map((flight) => `
+          flightsList.innerHTML = filtered.map((flight) => `
             <article class="flight-card">
               <div class="flight-card__top">
-                <span class="flight-number">${flight.flight_number}</span>
+                <span class="flight-number">${escapeHtml(flight.flight_number)}</span>
                 <span class="availability ${flight.available_seats > 0 ? "available" : "sold-out"}">
                   ${flight.available_seats > 0 ? "Disponible" : "Sin cupos"}
                 </span>
               </div>
 
               <div class="route">
-                <strong>${flight.origin}</strong>
+                <strong>${escapeHtml(flight.origin)}</strong>
                 <span class="plane">✈</span>
-                <strong>${flight.destination}</strong>
+                <strong>${escapeHtml(flight.destination)}</strong>
               </div>
 
               <p class="departure">
@@ -91,17 +108,35 @@ const pageTitle = "AeroReserva | Vuelos disponibles";
 
               <div class="flight-card__bottom">
                 <span>${flight.available_seats} cupos disponibles</span>
-                <button type="button" ${flight.available_seats === 0 ? "disabled" : ""}>
+                  <button
+                    type="button"
+                    data-flight-number="${escapeHtml(flight.flight_number)}"
+                    ${flight.available_seats === 0 ? "disabled" : ""}
+                  >
                   Seleccionar
                 </button>
               </div>
             </article>
           `).join("");
+
+          flightsList.querySelectorAll("button[data-flight-number]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const flightNumber = button.dataset.flightNumber;
+
+              if (flightNumber) {
+                window.location.href = `/reservar?vuelo=${encodeURIComponent(flightNumber)}`;
+              }
+            });
+          });
+          }
+          origin.addEventListener('change', renderFlights);
+          destination.addEventListener('change', renderFlights);
+          renderFlights();
         } catch (error) {
           loadingMessage.hidden = true;
           errorMessage.hidden = false;
           errorMessage.textContent =
-            "No pudimos consultar los vuelos. Verifica que Flight Service esté encendido.";
+            "No pudimos consultar los vuelos. Intenta actualizar la página en unos momentos.";
         }
       }
 
@@ -110,7 +145,7 @@ const pageTitle = "AeroReserva | Vuelos disponibles";
   </body>
 </html>
 
-<style>
+<style is:global>
   :root {
     font-family: Inter, ui-sans-serif, system-ui, sans-serif;
     color: #17202a;
@@ -329,4 +364,6 @@ const pageTitle = "AeroReserva | Vuelos disponibles";
       gap: 0.5rem;
     }
   }
+</style><style>
+.filters{display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem}.filters label{display:grid;gap:.5rem;color:#152f63;font-weight:700}.filters select{padding:.7rem;border:1px solid #e5ebf4;border-radius:8px;background:white;font:inherit}[hidden]{display:none!important}
 </style>

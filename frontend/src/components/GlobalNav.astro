@@ -1,15 +1,16 @@
----
+﻿---
+import { session } from '../lib/server';
+const passenger = session(Astro.cookies);
 interface Props {
   current?: "flights" | "passengers" | "bookings";
   tag: string;
 }
-
 const { current, tag } = Astro.props;
 
 const links = [
-  { key: "flights", href: "/", label: "Vuelos" },
-  { key: "passengers", href: "/pasajeros", label: "Pasajeros" },
-  { key: "bookings", href: "/reservas", label: "Reservas" },
+  { key: "flights", href: "/", label: "Inicio" },
+  
+  { key: "bookings", href: "/reservas", label: "Mis reservas" },
 ] as const;
 ---
 
@@ -28,7 +29,9 @@ const links = [
         {link.label}
       </a>
     ))}
+    {passenger ? <button id="logout" type="button">Salir</button> : <a href="/ingresar" aria-current={current === 'passengers' ? 'page' : undefined}>Ingresar</a>}
   </nav>
+  <p id="logout-error" role="alert" hidden></p>
 
   <span class="tag">{tag}</span>
 </header>
@@ -113,4 +116,22 @@ const links = [
       font-size: 0.8rem;
     }
   }
+</style>
+<script>
+document.querySelector<HTMLButtonElement>('#logout')?.addEventListener('click', async event => {
+ const button = event.currentTarget as HTMLButtonElement;
+ button.disabled = true; button.textContent = 'Saliendo…';
+ try {
+  const response = await fetch('/api/passengers', { method: 'DELETE' });
+  if (!response.ok) throw new Error();
+  location.href = '/';
+ } catch {
+  const message = document.querySelector<HTMLElement>('#logout-error')!;
+  message.hidden = false; message.textContent = 'No pudimos cerrar la sesión. Intenta de nuevo.';
+  button.disabled = false; button.textContent = 'Salir';
+ }
+});
+</script>
+<style>
+nav button{font:inherit;font-size:.9rem;font-weight:700;border:0;border-radius:8px;padding:.55rem .8rem;color:#152f63;background:#eef3fb;cursor:pointer}
 </style>

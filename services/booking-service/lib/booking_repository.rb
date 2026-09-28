@@ -44,6 +44,19 @@ class BookingRepository
     ).first
   end
 
+  def list_by_passenger(id)
+    result = CassandraClient.session.execute(
+      "SELECT * FROM bookings_by_passenger WHERE passenger_id = ?",
+      arguments: [Cassandra::Uuid.new(id)]
+    )
+    rows = result.to_a
+    until result.last_page?
+      result = result.next_page
+      rows.concat(result.to_a)
+    end
+    rows
+  end
+
   def list_all
     CassandraClient.session.execute("SELECT * FROM bookings_by_id").to_a
   end

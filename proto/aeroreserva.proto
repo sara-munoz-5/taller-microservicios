@@ -39,6 +39,7 @@ message GetByIdRequest {
 // ==================== PASAJEROS ====================
 
 service PassengerService {
+  rpc FindPassenger (FindPassengerRequest) returns (Passenger);
   rpc CreatePassenger (CreatePassengerRequest) returns (Passenger);
   rpc GetPassenger (GetByIdRequest) returns (Passenger);
 }
@@ -51,6 +52,12 @@ message Passenger {
   string email = 5;
 }
 
+message FindPassengerRequest {
+  string document_type = 1;
+  string document_number = 2;
+  string email = 3;
+}
+
 message CreatePassengerRequest {
   string document_type = 1;
   string document_number = 2;
@@ -61,6 +68,7 @@ message CreatePassengerRequest {
 // ==================== RESERVAS ====================
 
 service BookingService {
+  rpc ListBookingsByPassenger (GetByIdRequest) returns (BookingList);
   rpc CreateBooking (CreateBookingRequest) returns (Booking);
   rpc GetBooking (GetByIdRequest) returns (Booking);
   rpc ListBookings (Empty) returns (BookingList);

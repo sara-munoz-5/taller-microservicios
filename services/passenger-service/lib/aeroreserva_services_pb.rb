@@ -37,6 +37,7 @@ module Aeroreserva
         self.unmarshal_class_method = :decode
         self.service_name = 'aeroreserva.v1.PassengerService'
 
+        rpc :FindPassenger, ::Aeroreserva::V1::FindPassengerRequest, ::Aeroreserva::V1::Passenger
         rpc :CreatePassenger, ::Aeroreserva::V1::CreatePassengerRequest, ::Aeroreserva::V1::Passenger
         rpc :GetPassenger, ::Aeroreserva::V1::GetByIdRequest, ::Aeroreserva::V1::Passenger
       end
@@ -54,6 +55,7 @@ module Aeroreserva
         self.unmarshal_class_method = :decode
         self.service_name = 'aeroreserva.v1.BookingService'
 
+        rpc :ListBookingsByPassenger, ::Aeroreserva::V1::GetByIdRequest, ::Aeroreserva::V1::BookingList
         rpc :CreateBooking, ::Aeroreserva::V1::CreateBookingRequest, ::Aeroreserva::V1::Booking
         rpc :GetBooking, ::Aeroreserva::V1::GetByIdRequest, ::Aeroreserva::V1::Booking
         rpc :ListBookings, ::Aeroreserva::V1::Empty, ::Aeroreserva::V1::BookingList

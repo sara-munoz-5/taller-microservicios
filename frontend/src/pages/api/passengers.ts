@@ -1,79 +1,25 @@
-import type { APIRoute } from "astro";
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import path from "node:path";
-
+﻿import type { APIRoute } from 'astro';
+import { rpc, setSession, clearSession, session, sameOrigin, json, failure } from '../../lib/server';
 export const prerender = false;
-
-const protoPath = path.resolve(process.cwd(), "../proto/aeroreserva.proto");
-
-const packageDefinition = protoLoader.loadSync(protoPath, {
-  keepCase: true,
-  longs: String,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
-
-const proto = grpc.loadPackageDefinition(packageDefinition) as any;
-
-const passengerClient = new proto.aeroreserva.v1.PassengerService(
-  process.env.PASSENGER_SERVICE_URL || "localhost:50052",
-  grpc.credentials.createInsecure()
-);
-
-function createPassenger(request: {
-  document_type: string;
-  document_number: string;
-  full_name: string;
-  email: string;
-}) {
-  return new Promise<any>((resolve, reject) => {
-    passengerClient.CreatePassenger(
-      request,
-      (error: grpc.ServiceError | null, response: any) => {
-        if (error) reject(error);
-        else resolve(response);
-      }
-    );
-  });
-}
-
-function errorResponse(status: number, message: string) {
-  return new Response(JSON.stringify({ message }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-export const POST: APIRoute = async ({ request }) => {
-  const body = await request.json();
-
+export const GET: APIRoute = ({ cookies }) => {
+  const passenger = session(cookies);
+  return passenger ? json({ full_name: passenger.name }) : json({ message: 'Ingresa para continuar.' }, 401);
+};
+export const POST: APIRoute = async ({ request, cookies, url }) => {
+  if (!sameOrigin(request, url)) return json({ message: 'Solicitud no permitida.' }, 403);
   try {
-    const passenger = await createPassenger({
-      document_type: body.document_type,
-      document_number: body.document_number,
-      full_name: body.full_name,
-      email: body.email,
-    });
-
-    return new Response(JSON.stringify(passenger), {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const grpcError = error as grpc.ServiceError;
-
-    if (grpcError.code === grpc.status.INVALID_ARGUMENT) {
-      return errorResponse(400, grpcError.details || "Datos de pasajero inválidos.");
-    }
-
-    if (grpcError.code === grpc.status.ALREADY_EXISTS) {
-      return errorResponse(409, grpcError.details || "Ya existe un pasajero con ese documento.");
-    }
-
-    console.error("No fue posible consultar Passenger Service:", error);
-
-    return errorResponse(500, "No fue posible registrar el pasajero.");
-  }
+    const body = await request.json();
+    const input = Object.fromEntries(['document_type', 'document_number', 'email', 'full_name'].map(key => [key, typeof body[key] === 'string' ? body[key].trim() : '']));
+    input.email = input.email.toLowerCase();
+    if (!['CC', 'CE', 'Pasaporte'].includes(input.document_type) || !input.document_number || input.document_number.length > 50 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.email) || input.email.length > 254 || (body.mode === 'register' && (!input.full_name || input.full_name.length > 150))) return json({ message: 'Completa correctamente los datos del perfil.' }, 400);
+    if (!['register', 'login'].includes(body.mode)) return json({ message: 'Elige ingresar o crear perfil.' }, 400);
+    const passenger = await rpc('Passenger', body.mode === 'register' ? 'CreatePassenger' : 'FindPassenger', input);
+    setSession(cookies, passenger, url.protocol === 'https:');
+    return json({ full_name: passenger.full_name }, body.mode === 'register' ? 201 : 200);
+  } catch (error) { return failure(error); }
+};
+export const DELETE: APIRoute = ({ request, cookies, url }) => {
+  if (!sameOrigin(request, url)) return json({ message: 'Solicitud no permitida.' }, 403);
+  clearSession(cookies);
+  return json({ message: 'Sesión cerrada.' });
 };

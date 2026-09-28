@@ -58,6 +58,13 @@ class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
     )
   end
 
+  def list_bookings_by_passenger(request, _call)
+    validate_uuid(request.id, "Pasajero no válido")
+    Aeroreserva::V1::BookingList.new(
+      bookings: @repository.list_by_passenger(request.id).map { |row| booking_message(row) }
+    )
+  end
+
   def cancel_booking(request, _call)
     validate_uuid(request.id, "El identificador de la reserva no es válido")
 
