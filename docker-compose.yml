@@ -20,6 +20,25 @@ services:
       retries: 12
       start_period: 60s
 
+  cassandra-init:
+    image: cassandra:4.0
+    container_name: aeroreserva-cassandra-init
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - >-
+        set -eu;
+        cqlsh cassandra 9042 -f /cassandra-init/01-schema.cql;
+        cqlsh cassandra 9042 -f /cassandra-init/02-seed-flights.cql;
+        echo "Cassandra schema and seed initialization completed successfully"
+    volumes:
+      - ./infrastructure/cassandra:/cassandra-init:ro
+    networks:
+      - aeroreserva-network
+
   flight-service:
     build:
       context: .
@@ -34,8 +53,14 @@ services:
     ports:
       - "50061:50051"
     depends_on:
-      cassandra:
-        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "ruby", "-rsocket", "-e", "TCPSocket.new('127.0.0.1', ENV.fetch('GRPC_PORT')).close"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks:
       - aeroreserva-network
 
@@ -51,8 +76,14 @@ services:
       CASSANDRA_HOST: cassandra
       GRPC_PORT: 50052
     depends_on:
-      cassandra:
-        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "ruby", "-rsocket", "-e", "TCPSocket.new('127.0.0.1', ENV.fetch('GRPC_PORT')).close"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks:
       - aeroreserva-network
 
@@ -70,12 +101,18 @@ services:
       FLIGHT_SERVICE_ADDR: flight-service:50051
       PASSENGER_SERVICE_ADDR: passenger-service:50052
     depends_on:
-      cassandra:
-        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
       flight-service:
-        condition: service_started
+        condition: service_healthy
       passenger-service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "ruby", "-rsocket", "-e", "TCPSocket.new('127.0.0.1', ENV.fetch('GRPC_PORT')).close"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks:
       - aeroreserva-network
 
@@ -92,11 +129,11 @@ services:
       - "4321:4321"
     depends_on:
       flight-service:
-        condition: service_started
+        condition: service_healthy
       passenger-service:
-        condition: service_started
+        condition: service_healthy
       booking-service:
-        condition: service_started
+        condition: service_healthy
     networks:
       - aeroreserva-network
 
