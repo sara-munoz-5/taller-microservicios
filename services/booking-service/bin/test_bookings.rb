@@ -1,4 +1,4 @@
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+﻿$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 
 require "grpc"
 require "securerandom"
@@ -6,12 +6,12 @@ require "aeroreserva_pb"
 require "aeroreserva_services_pb"
 
 passenger_stub = Aeroreserva::V1::PassengerService::Stub.new(
-  "localhost:50052",
+  ENV.fetch("PASSENGER_SERVICE_ADDR", "localhost:50052"),
   :this_channel_is_insecure
 )
 
 flight_stub = Aeroreserva::V1::FlightService::Stub.new(
-  "localhost:50051",
+  ENV.fetch("FLIGHT_SERVICE_ADDR", "localhost:50051"),
   :this_channel_is_insecure
 )
 
@@ -22,12 +22,12 @@ booking_stub = Aeroreserva::V1::BookingService::Stub.new(
 
 def expect_grpc_error(code, description)
   yield
-  puts "FALLO: #{description} (no se levantó ningún error)"
+  raise "FALLO: #{description} (no se levantó ningún error)"
 rescue GRPC::BadStatus => e
   if e.code == code
     puts "OK: #{description} (#{e.code})"
   else
-    puts "FALLO: #{description} (se esperaba #{code}, se obtuvo #{e.code})"
+    raise "FALLO: #{description} (se esperaba #{code}, se obtuvo #{e.code})"
   end
 end
 
@@ -47,7 +47,7 @@ flights = flight_stub.list_flights(Aeroreserva::V1::Empty.new).flights
 flight = flights.find { |f| f.available_seats > 0 }
 
 unless flight
-  puts "FALLO: no hay vuelos con cupos disponibles para probar"
+  raise "FALLO: no hay vuelos con cupos disponibles para probar"
   exit 1
 end
 
@@ -65,7 +65,7 @@ booking = booking_stub.create_booking(
 if booking.status == :BOOKING_STATUS_CONFIRMED
   puts "OK: reserva creada con estado CONFIRMED (id=#{booking.id}, codigo=#{booking.booking_code})"
 else
-  puts "FALLO: la reserva no quedó CONFIRMED (status=#{booking.status})"
+  raise "FALLO: la reserva no quedó CONFIRMED (status=#{booking.status})"
 end
 
 # (d) crear una reserva con un passenger_id inventado -> NOT_FOUND
@@ -98,7 +98,7 @@ if found_booking.id == booking.id &&
    found_booking.status == booking.status
   puts "OK: get_booking devuelve los mismos datos"
 else
-  puts "FALLO: get_booking devuelve datos distintos a los creados"
+  raise "FALLO: get_booking devuelve datos distintos a los creados"
 end
 
 # (g) cancelar la reserva -> CANCELLED
@@ -107,7 +107,7 @@ cancelled_booking = booking_stub.cancel_booking(Aeroreserva::V1::GetByIdRequest.
 if cancelled_booking.status == :BOOKING_STATUS_CANCELLED
   puts "OK: reserva cancelada con estado CANCELLED"
 else
-  puts "FALLO: la reserva no quedó CANCELLED (status=#{cancelled_booking.status})"
+  raise "FALLO: la reserva no quedó CANCELLED (status=#{cancelled_booking.status})"
 end
 
 # (h) cancelarla otra vez -> FAILED_PRECONDITION
@@ -121,5 +121,6 @@ flight_after = flight_stub.get_flight(Aeroreserva::V1::GetByIdRequest.new(id: fl
 if flight_after.available_seats == original_available_seats
   puts "OK: available_seats volvió al valor original (#{original_available_seats})"
 else
-  puts "FALLO: available_seats no volvió al valor original (esperado=#{original_available_seats}, obtenido=#{flight_after.available_seats})"
+  raise "FALLO: available_seats no volvió al valor original (esperado=#{original_available_seats}, obtenido=#{flight_after.available_seats})"
 end
+

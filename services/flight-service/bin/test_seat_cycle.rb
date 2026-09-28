@@ -18,9 +18,11 @@ puts "Antes: #{before.available_seats} cupos"
 stub.occupy_seat(request)
 
 after_occupy = stub.check_availability(request)
+raise "No se descontó exactamente un cupo" unless after_occupy.available_seats == before.available_seats - 1
 puts "Después de ocupar: #{after_occupy.available_seats} cupos"
 
 stub.release_seat(request)
 
 after_release = stub.check_availability(request)
+raise "No se restauró el cupo" unless after_release.available_seats == before.available_seats
 puts "Después de liberar: #{after_release.available_seats} cupos"

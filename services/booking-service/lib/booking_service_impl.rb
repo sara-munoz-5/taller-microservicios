@@ -1,5 +1,6 @@
 require "grpc"
 require "time"
+require "json"
 require_relative "aeroreserva_services_pb"
 require_relative "booking_repository"
 require_relative "flight_client"
@@ -8,10 +9,10 @@ require_relative "passenger_client"
 class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
   UUID_PATTERN = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
 
-  def initialize
-    @repository = BookingRepository.new
-    @flight_client = FlightClient.new
-    @passenger_client = PassengerClient.new
+  def initialize(repository: BookingRepository.new, flight_client: FlightClient.new,
+                 passenger_client: PassengerClient.new, logger: $stdout)
+    @repository, @flight_client, @passenger_client = repository, flight_client, passenger_client
+    @logger = logger
   end
 
   def create_booking(request, _call)
@@ -35,10 +36,32 @@ class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
       )
     end
 
+    booking = @repository.prepare_booking(passenger_id: request.passenger_id, flight_id: request.flight_id)
+    # A timeout while occupying is ambiguous: never blindly repeat or release.
     @flight_client.occupy_seat(request.flight_id)
-
-    booking = @repository.crear(passenger_id: request.passenger_id, flight_id: request.flight_id)
-    booking_message(booking)
+    begin
+      saga_log("seat_occupied", booking)
+      @repository.persist_booking(booking)
+      response = booking_message(booking)
+      saga_log("confirmed", booking)
+      response
+    rescue StandardError => error
+      saga_log("persistence_failed", booking, error: error.class.name)
+      begin
+        @repository.compensate_creation(booking)
+        saga_log("booking_compensated", booking)
+      rescue StandardError => cleanup_error
+        saga_log("booking_compensation_failed", booking, error: cleanup_error.class.name)
+      end
+      begin
+        @flight_client.release_seat(request.flight_id)
+        saga_log("seat_compensated", booking)
+      rescue StandardError => compensation_error
+        saga_log("seat_compensation_failed", booking, error: compensation_error.class.name)
+      end
+      raise grpc_error(GRPC::Core::StatusCodes::INTERNAL,
+                       "No fue posible confirmar la reserva. Consulta tus reservas antes de intentar de nuevo.")
+    end
   end
 
   def get_booking(request, _call)
@@ -87,6 +110,11 @@ class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
   end
 
   private
+
+  def saga_log(event, booking, **fields)
+    @logger.puts(JSON.generate({ pattern: "booking_saga", event: event,
+      booking_id: booking["id"].to_s, flight_id: booking["flight_id"].to_s }.merge(fields)))
+  end
 
   def booking_message(row)
     Aeroreserva::V1::Booking.new(

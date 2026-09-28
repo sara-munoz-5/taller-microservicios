@@ -1,4 +1,4 @@
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+﻿$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 
 require "grpc"
 require "securerandom"
@@ -12,12 +12,12 @@ stub = Aeroreserva::V1::PassengerService::Stub.new(
 
 def expect_grpc_error(code, description)
   yield
-  puts "FALLO: #{description} (no se levantó ningún error)"
+  raise "FALLO: #{description} (no se levantó ningún error)"
 rescue GRPC::BadStatus => e
   if e.code == code
     puts "OK: #{description} (#{e.code})"
   else
-    puts "FALLO: #{description} (se esperaba #{code}, se obtuvo #{e.code})"
+    raise "FALLO: #{description} (se esperaba #{code}, se obtuvo #{e.code})"
   end
 end
 
@@ -62,7 +62,7 @@ if found.id == passenger.id &&
    found.email == passenger.email
   puts "OK: get_passenger devuelve los mismos datos"
 else
-  puts "FALLO: get_passenger devuelve datos distintos a los creados"
+  raise "FALLO: get_passenger devuelve datos distintos a los creados"
 end
 
 # (e) consultar un id inventado -> NOT_FOUND
@@ -71,3 +71,4 @@ fake_id = SecureRandom.uuid
 expect_grpc_error(GRPC::Core::StatusCodes::NOT_FOUND, "consultar pasajero inexistente") do
   stub.get_passenger(Aeroreserva::V1::GetByIdRequest.new(id: fake_id))
 end
+

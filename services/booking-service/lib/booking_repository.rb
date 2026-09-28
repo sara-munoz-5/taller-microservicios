@@ -1,40 +1,52 @@
 require "securerandom"
+require "sorted_set"
 require "cassandra"
 require_relative "cassandra_client"
 
 class BookingRepository
   def crear(passenger_id:, flight_id:)
-    id = SecureRandom.uuid
-    uuid = Cassandra::Uuid.new(id)
-    passenger_uuid = Cassandra::Uuid.new(passenger_id)
-    flight_uuid = Cassandra::Uuid.new(flight_id)
-    booking_code = "RES-" + SecureRandom.hex(3).upcase
-    created_at = Time.now.utc
-    status = "CONFIRMED"
+    persist_booking(prepare_booking(passenger_id: passenger_id, flight_id: flight_id))
+  end
 
-    CassandraClient.session.execute(
-      "INSERT INTO bookings_by_id (id, booking_code, passenger_id, flight_id, created_at, status) VALUES (?, ?, ?, ?, ?, ?)",
-      arguments: [uuid, booking_code, passenger_uuid, flight_uuid, created_at, status]
-    )
-
-    CassandraClient.session.execute(
-      "INSERT INTO bookings_by_passenger (passenger_id, created_at, id, booking_code, flight_id, status) VALUES (?, ?, ?, ?, ?, ?)",
-      arguments: [passenger_uuid, created_at, uuid, booking_code, flight_uuid, status]
-    )
-
-    CassandraClient.session.execute(
-      "INSERT INTO bookings_by_status (status, created_at, id, booking_code, passenger_id, flight_id) VALUES (?, ?, ?, ?, ?, ?)",
-      arguments: [status, created_at, uuid, booking_code, passenger_uuid, flight_uuid]
-    )
-
+  # Allocate identifiers before the saga so a partial write can be compensated.
+  def prepare_booking(passenger_id:, flight_id:)
     {
-      "id" => id,
-      "booking_code" => booking_code,
-      "passenger_id" => passenger_id,
-      "flight_id" => flight_id,
-      "created_at" => created_at,
-      "status" => status
+      "id" => Cassandra::Uuid.new(SecureRandom.uuid),
+      "booking_code" => "RES-" + SecureRandom.hex(3).upcase,
+      "passenger_id" => Cassandra::Uuid.new(passenger_id),
+      "flight_id" => Cassandra::Uuid.new(flight_id),
+      "created_at" => Time.at((Time.now.to_r * 1000).floor / 1000r).utc,
+      "status" => "CONFIRMED"
     }
+  end
+
+  def persist_booking(booking)
+    write_booking(booking)
+    booking
+  end
+
+  # Keep an audit row instead of deleting data. A logged batch removes the old
+  # status projection and writes CANCELLED to all three tables.
+  def compensate_creation(booking)
+    write_booking(booking.merge("status" => "CANCELLED"), previous_status: "CONFIRMED")
+  end
+
+  def write_booking(booking, previous_status: nil)
+    id, code, passenger, flight, created, status = booking.values_at(
+      "id", "booking_code", "passenger_id", "flight_id", "created_at", "status"
+    )
+    batch = CassandraClient.session.batch
+    batch.add("INSERT INTO bookings_by_id (id, booking_code, passenger_id, flight_id, created_at, status) VALUES (?, ?, ?, ?, ?, ?)",
+              arguments: [id, code, passenger, flight, created, status])
+    batch.add("INSERT INTO bookings_by_passenger (passenger_id, created_at, id, booking_code, flight_id, status) VALUES (?, ?, ?, ?, ?, ?)",
+              arguments: [passenger, created, id, code, flight, status])
+    batch.add("INSERT INTO bookings_by_status (status, created_at, id, booking_code, passenger_id, flight_id) VALUES (?, ?, ?, ?, ?, ?)",
+              arguments: [status, created, id, code, passenger, flight])
+    if previous_status
+      batch.add("DELETE FROM bookings_by_status WHERE status = ? AND created_at = ? AND id = ?",
+                arguments: [previous_status, created, id])
+    end
+    CassandraClient.session.execute(batch, consistency: :local_quorum)
   end
 
   def find_by_id(id)
