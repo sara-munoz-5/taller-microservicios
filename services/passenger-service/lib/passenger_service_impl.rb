@@ -51,6 +51,20 @@ class PassengerServiceImpl < Aeroreserva::V1::PassengerService::Service
     passenger_message(row)
   end
 
+  def find_passenger(request, _call)
+    if [request.document_type, request.document_number, request.email].any? { |value| value.strip.empty? }
+      raise grpc_error(GRPC::Core::StatusCodes::INVALID_ARGUMENT, "Completa documento y correo")
+    end
+    row = CassandraClient.session.execute(
+      "SELECT * FROM passengers_by_document WHERE document_type = ? AND document_number = ?",
+      arguments: [request.document_type, request.document_number]
+    ).first
+    unless row && row["email"].strip.casecmp?(request.email.strip)
+      raise grpc_error(GRPC::Core::StatusCodes::NOT_FOUND, "No encontramos un perfil con esos datos")
+    end
+    passenger_message(row)
+  end
+
   private
 
   def ensure_document_not_taken(document_type, document_number)

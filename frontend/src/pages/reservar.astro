@@ -1,0 +1,46 @@
+﻿---
+import DemoLayout from '../layouts/DemoLayout.astro';
+import { session } from '../lib/server';
+const passenger = session(Astro.cookies);
+if (!passenger) return Astro.redirect('/ingresar?next=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
+---
+<DemoLayout title="Confirma tu vuelo">
+<p>Viajas como <strong>{passenger.name}</strong>.</p>
+<p id="loading" role="status">Cargando el vuelo seleccionado…</p>
+<p id="error" class="error" role="alert" hidden></p>
+<section id="flight" class="card" hidden></section>
+<form id="reservation-form" hidden><button>Confirmar reserva</button></form>
+<section id="confirmation" class="card" hidden aria-live="polite"><h2>Tu viaje está listo</h2><p>Código de reserva: <strong id="booking-code"></strong></p><p id="booking-status">Confirmada</p><a href="/reservas">Ver Mis reservas y cancelar</a></section>
+<p><a href="/">Volver a Inicio</a></p>
+<script>
+import { api, formatDate, escapeHtml } from '../lib/browser';
+const flightNumber = new URLSearchParams(location.search).get('vuelo');
+const form = document.querySelector<HTMLFormElement>('#reservation-form')!;
+const errorMessage = document.querySelector<HTMLParagraphElement>('#error')!;
+const showError = (error: unknown) => { errorMessage.hidden = false; errorMessage.textContent = error instanceof Error ? error.message : 'No pudimos completar la solicitud.'; };
+async function load() {
+ try {
+  const flights = await api('/api/flights');
+  const flight = flights.find((f: any) => f.flight_number === flightNumber);
+  if (!flight) throw new Error('Elige un vuelo desde Inicio para continuar.');
+  const summary = document.querySelector<HTMLElement>('#flight')!;
+  summary.innerHTML = `<h2>${escapeHtml(flight.origin)} → ${escapeHtml(flight.destination)}</h2><p>${escapeHtml(flight.flight_number)}</p><p>Salida: ${formatDate(flight.departure_at)} (hora Colombia)</p><p>Llegada: ${formatDate(flight.arrival_at)}</p><p>${flight.available_seats} cupos disponibles</p>`;
+  summary.hidden = false;
+  if (flight.available_seats <= 0) throw new Error('Este vuelo ya no tiene cupos. Elige otra ruta.');
+  form.hidden = false;
+ } catch (error) { showError(error); }
+ finally { document.querySelector<HTMLElement>('#loading')!.hidden = true; }
+}
+form.addEventListener('submit', async event => {
+ event.preventDefault(); const button = form.querySelector('button')!;
+ button.disabled = true; button.textContent = 'Confirmando…'; errorMessage.hidden = true;
+ try {
+  const booking = await api('/api/bookings', 'POST', { flight_number: flightNumber });
+  document.querySelector('#booking-code')!.textContent = booking.booking_code;
+  document.querySelector<HTMLElement>('#confirmation')!.hidden = false; form.hidden = true;
+ } catch (error) { showError(error); }
+ finally { button.disabled = false; button.textContent = 'Confirmar reserva'; }
+});
+load();
+</script>
+</DemoLayout>

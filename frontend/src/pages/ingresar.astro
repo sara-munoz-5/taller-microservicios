@@ -1,0 +1,55 @@
+﻿---
+import DemoLayout from '../layouts/DemoLayout.astro';
+import { session } from '../lib/server';
+const requested = Astro.url.searchParams.get('next') || '/reservas';
+// Only local, explicitly supported destinations can be used after identification.
+let next = '/reservas';
+try {
+ const target = new URL(requested, Astro.url);
+ if (target.origin === Astro.url.origin && ['/', '/reservas', '/reservar'].includes(target.pathname)) next = target.pathname + target.search;
+} catch {}
+if (session(Astro.cookies)) return Astro.redirect(next);
+---
+<DemoLayout title="Ingresar / crear perfil" current="passengers">
+<section class="card profile">
+<p class="muted">Identificación de demostración, sin contraseña. Usa documento y correo para recuperar tu perfil.</p>
+<form id="profile-form" data-next={next}>
+<fieldset>
+<label>¿Qué deseas hacer?<select name="mode" id="mode"><option value="login">Ingresar</option><option value="register">Crear perfil</option></select></label>
+<label>Tipo de documento<select name="document_type"><option value="CC">Cédula de ciudadanía (CC)</option><option value="CE">Cédula de extranjería (CE)</option><option value="Pasaporte">Pasaporte</option></select></label>
+<label>Número de documento<input name="document_number" required maxlength="50" autocomplete="off" /></label>
+<label>Correo electrónico<input name="email" type="email" required maxlength="254" autocomplete="email" /></label>
+<label id="name-field" hidden>Nombre completo<input name="full_name" maxlength="150" autocomplete="name" /></label>
+<button type="submit">Ingresar</button>
+</fieldset>
+<p id="profile-message" role="status" hidden></p>
+</form>
+</section>
+<script>
+const form = document.querySelector<HTMLFormElement>('#profile-form')!;
+const mode = document.querySelector<HTMLSelectElement>('#mode')!;
+const nameField = document.querySelector<HTMLElement>('#name-field')!;
+const nameInput = form.elements.namedItem('full_name') as HTMLInputElement;
+const button = form.querySelector('button')!;
+const message = document.querySelector<HTMLParagraphElement>('#profile-message')!;
+mode.addEventListener('change', () => {
+ nameField.hidden = mode.value !== 'register'; nameInput.required = mode.value === 'register';
+ button.textContent = mode.value === 'register' ? 'Crear perfil' : 'Ingresar';
+});
+form.addEventListener('submit', async event => {
+ event.preventDefault();
+ const body = Object.fromEntries(new FormData(form));
+ const fieldset = form.querySelector('fieldset')!;
+ fieldset.disabled = true; button.textContent = 'Continuando…'; message.hidden = true;
+ try {
+  const response = await fetch('/api/passengers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(response.status === 404 ? 'No encontramos un perfil con esos datos. Revisa documento y correo o elige Crear perfil.' : result.message);
+  location.href = form.dataset.next!;
+ } catch (error) {
+  message.textContent = error instanceof Error ? error.message : 'No pudimos continuar. Intenta de nuevo.';
+  message.className = 'error'; message.hidden = false;
+ } finally { fieldset.disabled = false; button.textContent = mode.value === 'register' ? 'Crear perfil' : 'Ingresar'; }
+});
+</script>
+</DemoLayout>
