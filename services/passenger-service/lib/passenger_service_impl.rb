@@ -9,19 +9,22 @@ class PassengerServiceImpl < Aeroreserva::V1::PassengerService::Service
 
   def create_passenger(request, _call)
     validate_passenger_input(request)
-    ensure_document_not_taken(request.document_type, request.document_number)
 
     id = SecureRandom.uuid
     uuid = Cassandra::Uuid.new(id)
 
+    # Claim the document with a Paxos (LWT) insert: of two simultaneous
+    # registrations only one wins, so a document never maps to two passengers.
+    claimed = CassandraClient.session.execute(
+      "INSERT INTO passengers_by_document (document_type, document_number, id, full_name, email) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS",
+      arguments: [request.document_type, request.document_number, uuid, request.full_name, request.email],
+      serial_consistency: :local_serial
+    ).first["[applied]"]
+    document_taken(request.document_type, request.document_number) unless claimed
+
     CassandraClient.session.execute(
       "INSERT INTO passengers_by_id (id, document_type, document_number, full_name, email) VALUES (?, ?, ?, ?, ?)",
       arguments: [uuid, request.document_type, request.document_number, request.full_name, request.email]
-    )
-
-    CassandraClient.session.execute(
-      "INSERT INTO passengers_by_document (document_type, document_number, id, full_name, email) VALUES (?, ?, ?, ?, ?)",
-      arguments: [request.document_type, request.document_number, uuid, request.full_name, request.email]
     )
 
     Aeroreserva::V1::Passenger.new(
@@ -67,14 +70,7 @@ class PassengerServiceImpl < Aeroreserva::V1::PassengerService::Service
 
   private
 
-  def ensure_document_not_taken(document_type, document_number)
-    existing = CassandraClient.session.execute(
-      "SELECT id FROM passengers_by_document WHERE document_type = ? AND document_number = ?",
-      arguments: [document_type, document_number]
-    ).first
-
-    return unless existing
-
+  def document_taken(document_type, document_number)
     raise grpc_error(
       GRPC::Core::StatusCodes::ALREADY_EXISTS,
       "Ya existe un pasajero con el documento #{document_type} #{document_number}"

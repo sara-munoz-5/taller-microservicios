@@ -73,35 +73,39 @@ class BookingRepository
     CassandraClient.session.execute("SELECT * FROM bookings_by_id").to_a
   end
 
-  def cancelar(booking)
-    id = booking["id"]
-    passenger_id = booking["passenger_id"]
-    flight_id = booking["flight_id"]
-    created_at = booking["created_at"]
-    old_status = booking["status"]
-    booking_code = booking["booking_code"]
-    new_status = "CANCELLED"
+  # CONFIRMED -> CANCELLED is a single Paxos (LWT) step on the source table:
+  # of two concurrent cancellations only one is applied, so only that one
+  # releases the seat. Returns true when this call won the transition.
+  def mark_cancelled(booking)
+    change_status(booking["id"], from: "CONFIRMED", to: "CANCELLED")
+  end
 
-    CassandraClient.session.execute(
-      "UPDATE bookings_by_id SET status = ? WHERE id = ?",
-      arguments: [new_status, id]
+  # Compensation when the seat could not be released.
+  def revert_cancellation(booking)
+    change_status(booking["id"], from: "CANCELLED", to: "CONFIRMED")
+  end
+
+  # Idempotent: rewrites the read projections after bookings_by_id changed.
+  def project_cancellation(booking)
+    id, code, passenger, flight, created = booking.values_at(
+      "id", "booking_code", "passenger_id", "flight_id", "created_at"
     )
+    batch = CassandraClient.session.batch
+    batch.add("UPDATE bookings_by_passenger SET status = 'CANCELLED' WHERE passenger_id = ? AND created_at = ? AND id = ?",
+              arguments: [passenger, created, id])
+    batch.add("DELETE FROM bookings_by_status WHERE status = 'CONFIRMED' AND created_at = ? AND id = ?",
+              arguments: [created, id])
+    batch.add("INSERT INTO bookings_by_status (status, created_at, id, booking_code, passenger_id, flight_id) VALUES ('CANCELLED', ?, ?, ?, ?, ?)",
+              arguments: [created, id, code, passenger, flight])
+    CassandraClient.session.execute(batch, consistency: :local_quorum)
+  end
 
+  private
+
+  def change_status(id, from:, to:)
     CassandraClient.session.execute(
-      "UPDATE bookings_by_passenger SET status = ? WHERE passenger_id = ? AND created_at = ? AND id = ?",
-      arguments: [new_status, passenger_id, created_at, id]
-    )
-
-    CassandraClient.session.execute(
-      "DELETE FROM bookings_by_status WHERE status = ? AND created_at = ? AND id = ?",
-      arguments: [old_status, created_at, id]
-    )
-
-    CassandraClient.session.execute(
-      "INSERT INTO bookings_by_status (status, created_at, id, booking_code, passenger_id, flight_id) VALUES (?, ?, ?, ?, ?, ?)",
-      arguments: [new_status, created_at, id, booking_code, passenger_id, flight_id]
-    )
-
-    find_by_id(id.to_s)
+      "UPDATE bookings_by_id SET status = ? WHERE id = ? IF status = ?",
+      arguments: [to, id, from], consistency: :local_quorum, serial_consistency: :local_serial
+    ).first["[applied]"]
   end
 end

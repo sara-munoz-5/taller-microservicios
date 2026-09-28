@@ -96,20 +96,45 @@ class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
       raise grpc_error(GRPC::Core::StatusCodes::NOT_FOUND, "reserva no encontrada")
     end
 
-    if booking["status"] == "CANCELLED"
+    cancelled = booking.merge("status" => "CANCELLED")
+    # Claim the cancellation before touching the seat, so a double click or two
+    # tabs can never release two seats for one booking.
+    unless @repository.mark_cancelled(booking)
+      # Repair projections a previous cancellation may have left behind.
+      project_cancellation(cancelled)
       raise grpc_error(
         GRPC::Core::StatusCodes::FAILED_PRECONDITION,
         "la reserva ya fue cancelada"
       )
     end
 
-    @flight_client.release_seat(booking["flight_id"].to_s)
+    begin
+      @flight_client.release_seat(booking["flight_id"].to_s)
+    rescue StandardError => error
+      saga_log("seat_release_failed", booking, error: error.class.name)
+      begin
+        @repository.revert_cancellation(booking)
+        saga_log("cancellation_reverted", booking)
+      rescue StandardError => revert_error
+        saga_log("cancellation_revert_failed", booking, error: revert_error.class.name)
+      end
+      raise
+    end
 
-    updated_booking = @repository.cancelar(booking)
-    booking_message(updated_booking)
+    project_cancellation(cancelled)
+    saga_log("cancelled", booking)
+    booking_message(cancelled)
   end
 
   private
+
+  # bookings_by_id is already CANCELLED; a projection failure must not turn a
+  # committed cancellation into a failed RPC.
+  def project_cancellation(booking)
+    @repository.project_cancellation(booking)
+  rescue StandardError => error
+    saga_log("cancellation_projection_failed", booking, error: error.class.name)
+  end
 
   def saga_log(event, booking, **fields)
     @logger.puts(JSON.generate({ pattern: "booking_saga", event: event,
