@@ -1,4 +1,4 @@
-﻿# AeroReserva
+# AeroReserva
 
 Demo de reservas con BFF Astro, servicios Ruby/gRPC y Cassandra. Arranque:
 
@@ -55,3 +55,23 @@ node tests/demo-flow.cjs <ruta-al-paquete-playwright>
 La prueba usa Edge instalado, crea dos perfiles ficticios con documento único y deja la reserva de prueba cancelada. Comprueba aislamiento, cookie alterada, origen externo, filtros, cupos, reingreso y ausencia de UUID visibles. No elimina datos. El argumento de Playwright es la carpeta del paquete instalado temporalmente por npm, no su ejecutable.
 
 Resultados y lista exacta de archivos: [validación del incremento](docs/validacion-identificacion.md).
+
+## Pruebas automatizadas por servicio
+
+Con los contenedores levantados, cada servicio ejecuta sus pruebas (unitarias e integración real contra Cassandra y los otros servicios) con un solo comando:
+
+```powershell
+docker exec aeroreserva-booking-service bin/rails test
+docker exec aeroreserva-flight-service bin/rails test
+docker exec aeroreserva-passenger-service bin/rails test
+```
+
+Los scripts `bin/test_*.rb` de cada servicio se conservan como prueba rápida antes de una demo. Resultados y escenarios de fallo: [validación de resiliencia](docs/validacion-resiliencia.md).
+
+## Preparar la demostración
+
+1. Abrir Docker Desktop y levantar todo al menos 2 minutos antes: `docker compose up --build -d`. Cassandra tarda alrededor de un minuto; la web está lista cuando `docker compose ps` muestra `aeroreserva-web` como `healthy`.
+2. Opcional, para empezar con los 9 vuelos con todos sus cupos: `docker compose down -v` y luego `docker compose up --build -d`. `-v` borra el volumen de Cassandra (pasajeros, reservas y cupos); el inicializador vuelve a cargar el esquema y los vuelos.
+3. No reiniciar el contenedor `aeroreserva-web` durante la presentación: la clave de la sesión se genera por proceso y todas las sesiones se cerrarían.
+4. Los eventos de la saga y del circuit breaker se ven en vivo con `docker compose logs -f booking-service`.
+5. Los vuelos del seed salen entre el 20 y el 27 de octubre de 2026; después de esas fechas la prueba de extremo a extremo falla porque exige vuelos futuros.

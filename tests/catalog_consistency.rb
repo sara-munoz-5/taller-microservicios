@@ -1,4 +1,4 @@
-﻿# Ejecutar dentro de flight-service; solo consulta su propio keyspace.
+# Ejecutar dentro de flight-service; solo consulta su propio keyspace.
 require_relative '/app/lib/cassandra_client'
 session = CassandraClient.session
 catalog = session.execute("SELECT * FROM flights_catalog WHERE catalog = 'ACTIVE'").to_a

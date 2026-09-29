@@ -78,6 +78,9 @@ services:
       RAILS_ENV: development
       CASSANDRA_HOST: cassandra
       GRPC_PORT: 50052
+      CASSANDRA_TIMEOUT_SECONDS: ${CASSANDRA_TIMEOUT_SECONDS:-0.8}
+    expose:
+      - "50052"
     depends_on:
       cassandra-init:
         condition: service_completed_successfully
@@ -109,6 +112,8 @@ services:
       GRPC_READ_RETRIES: ${GRPC_READ_RETRIES:-1}
       GRPC_RETRY_DELAY_SECONDS: ${GRPC_RETRY_DELAY_SECONDS:-0.05}
       CASSANDRA_TIMEOUT_SECONDS: ${CASSANDRA_TIMEOUT_SECONDS:-0.8}
+    expose:
+      - "50053"
     depends_on:
       cassandra-init:
         condition: service_completed_successfully
@@ -136,6 +141,12 @@ services:
       BOOKING_SERVICE_URL: booking-service:50053
     ports:
       - "4321:4321"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4321/api/flights').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       flight-service:
         condition: service_healthy

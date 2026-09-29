@@ -4,10 +4,6 @@ require "cassandra"
 require_relative "cassandra_client"
 
 class BookingRepository
-  def crear(passenger_id:, flight_id:)
-    persist_booking(prepare_booking(passenger_id: passenger_id, flight_id: flight_id))
-  end
-
   # Allocate identifiers before the saga so a partial write can be compensated.
   def prepare_booking(passenger_id:, flight_id:)
     {

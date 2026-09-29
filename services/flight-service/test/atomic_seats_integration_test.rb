@@ -1,4 +1,4 @@
-﻿require 'minitest/autorun'
+require 'minitest/autorun'
 require 'securerandom'
 require_relative '../lib/flight_service_impl'
 

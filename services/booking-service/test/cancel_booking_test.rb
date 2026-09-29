@@ -32,17 +32,40 @@ class CancelBookingTest < Minitest::Test
 
   def test_lost_race_never_releases_a_second_seat
     events = @events
+    cancelled = @repo.find_by_id(ID).merge('status' => 'CANCELLED')
     @repo.define_singleton_method(:mark_cancelled) { |_booking| events << :mark; false }
+    @repo.define_singleton_method(:find_by_id) { |_id| cancelled }
     assert_raises(GRPC::FailedPrecondition) { cancel }
     refute_includes @events, :release
     assert_equal [:mark, :project], @events
   end
 
-  def test_failed_release_reverts_cancellation
-    @flight.define_singleton_method(:release_seat) { |_id| raise GRPC::Unavailable.new('down') }
+  def test_lost_race_does_not_mark_a_reverted_booking_as_cancelled
+    events = @events
+    @repo.define_singleton_method(:mark_cancelled) { |_booking| events << :mark; false }
+    # find_by_id still returns CONFIRMED: the winner reverted its cancellation.
+    assert_raises(GRPC::FailedPrecondition) { cancel }
+    assert_equal [:mark], @events
+  end
+
+  def test_circuit_rejection_reverts_cancellation
+    @flight.define_singleton_method(:release_seat) { |_id| raise GrpcResilience::NotAttempted.new('open') }
     assert_raises(GRPC::Unavailable) { cancel }
     assert_equal [:mark, :revert], @events
     assert_includes @log.string, 'cancellation_reverted'
+  end
+
+  def test_definite_rejection_reverts_cancellation
+    @flight.define_singleton_method(:release_seat) { |_id| raise GRPC::FailedPrecondition.new('full') }
+    assert_raises(GRPC::FailedPrecondition) { cancel }
+    assert_equal [:mark, :revert], @events
+  end
+
+  def test_ambiguous_release_keeps_cancellation_and_never_reconfirms
+    @flight.define_singleton_method(:release_seat) { |_id| raise GRPC::Unavailable.new('timeout') }
+    assert_equal :BOOKING_STATUS_CANCELLED, cancel.status
+    assert_equal [:mark, :project], @events
+    assert_includes @log.string, 'seat_release_ambiguous'
   end
 
   def test_projection_failure_keeps_committed_cancellation

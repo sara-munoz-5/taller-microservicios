@@ -1,0 +1,4 @@
+# Scripts executed inside Linux containers must keep LF line endings,
+# otherwise "#!/usr/bin/env ruby" becomes "ruby\r" and fails.
+services/*/bin/* text eol=lf
+services/*/bin/*.cmd text eol=crlf

@@ -1,4 +1,4 @@
-﻿require "grpc"
+require "grpc"
 require "time"
 require "json"
 require_relative "aeroreserva_services_pb"
@@ -81,12 +81,13 @@ class FlightServiceImpl < Aeroreserva::V1::FlightService::Service
       # and propagates without retrying the seat mutation.
       next unless applied
 
+      # Projection failures must not turn a committed mutation into a failed RPC:
+      # the re-read and the projection write are both logged, never raised.
       begin
         project_safely(find_flight(id))
       rescue StandardError => error
         projection_log(id, error)
       end
-      # Projection failures must not turn a committed mutation into a failed RPC.
       return flight_message(flight.merge("available_seats" => updated))
     end
     raise GRPC::Aborted.new("El vuelo está recibiendo muchas solicitudes. Consulta de nuevo sus cupos.")

@@ -1,3 +1,7 @@
+# Container logs are not a TTY: flush each line so saga and circuit-breaker
+# events appear in "docker compose logs" immediately.
+$stdout.sync = true
+
 require_relative "../config/environment"
 require "grpc"
 require_relative "../lib/passenger_service_impl"

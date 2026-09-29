@@ -8,6 +8,9 @@ require_relative "passenger_client"
 
 class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
   UUID_PATTERN = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+  # Answers that prove ReleaseSeat did not change the seat count.
+  SEAT_NOT_RELEASED = [GrpcResilience::NotAttempted, GRPC::FailedPrecondition, GRPC::NotFound,
+                       GRPC::InvalidArgument, GRPC::Aborted].freeze
 
   def initialize(repository: BookingRepository.new, flight_client: FlightClient.new,
                  passenger_client: PassengerClient.new, logger: $stdout)
@@ -100,8 +103,11 @@ class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
     # Claim the cancellation before touching the seat, so a double click or two
     # tabs can never release two seats for one booking.
     unless @repository.mark_cancelled(booking)
-      # Repair projections a previous cancellation may have left behind.
-      project_cancellation(cancelled)
+      # Repair projections a previous cancellation may have left behind, but
+      # only if the source is CANCELLED: a concurrent cancellation whose seat
+      # release failed may have reverted it to CONFIRMED meanwhile.
+      current = @repository.find_by_id(request.id)
+      project_cancellation(cancelled) if current && current["status"] == "CANCELLED"
       raise grpc_error(
         GRPC::Core::StatusCodes::FAILED_PRECONDITION,
         "la reserva ya fue cancelada"
@@ -110,7 +116,8 @@ class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
 
     begin
       @flight_client.release_seat(booking["flight_id"].to_s)
-    rescue StandardError => error
+    rescue *SEAT_NOT_RELEASED => error
+      # flight-service certainly did not release the seat: undo the claim.
       saga_log("seat_release_failed", booking, error: error.class.name)
       begin
         @repository.revert_cancellation(booking)
@@ -119,6 +126,11 @@ class BookingServiceImpl < Aeroreserva::V1::BookingService::Service
         saga_log("cancellation_revert_failed", booking, error: revert_error.class.name)
       end
       raise
+    rescue StandardError => error
+      # Timeout or lost response: the seat may already be free. Reverting could
+      # leave a CONFIRMED booking without its seat, so the booking stays
+      # CANCELLED and the possibly held seat is logged for reconciliation.
+      saga_log("seat_release_ambiguous", booking, error: error.class.name)
     end
 
     project_cancellation(cancelled)
