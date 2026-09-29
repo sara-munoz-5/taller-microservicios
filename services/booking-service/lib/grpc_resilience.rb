@@ -2,6 +2,20 @@ require "grpc"
 require "json"
 require "thread"
 
+# Pattern: GoF Proxy/Decorator applied to outgoing gRPC calls, implementing
+# the Circuit Breaker resilience pattern.
+#
+# FlightClient and PassengerClient do not invoke their gRPC stub directly: each
+# stub call is passed as a block to GrpcResilience#call, which wraps it with
+# cross-cutting behavior (per-call deadline, bounded retry for reads, and the
+# closed/open/half-open circuit) and then delegates to the real call. The
+# clients keep the same interface (get_flight, occupy_seat, release_seat,
+# get_passenger), so BookingServiceImpl uses them without knowing that the
+# resilience layer exists. Strictly, the wrapped object is the stub invocation
+# rather than the client class itself, and the wrapper is generic (a block)
+# instead of sharing the stub's interface, which is why it reads as a Proxy
+# around each call more than as a textbook Decorator subclass.
+#
 # One instance per dependency, shared by the gRPC worker threads.
 class GrpcResilience
   TRANSIENT = [GRPC::Unavailable, GRPC::DeadlineExceeded].freeze

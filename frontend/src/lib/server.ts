@@ -3,9 +3,10 @@ import * as loader from '@grpc/proto-loader';
 import path from 'node:path';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { AstroCookies } from 'astro';
+import { createGrpcClients } from './grpc-client-factory';
 const definition = loader.loadSync(path.resolve(process.cwd(), '../proto/aeroreserva.proto'), { keepCase: true, enums: String, defaults: true });
 const proto = (grpc.loadPackageDefinition(definition) as any).aeroreserva.v1;
-const clients = Object.fromEntries(['Flight', 'Passenger', 'Booking'].map((name, index) => [name, new proto[`${name}Service`](process.env[`${name.toUpperCase()}_SERVICE_URL`] || `localhost:${50051 + index}`, grpc.credentials.createInsecure())]));
+const clients = createGrpcClients(proto);
 export function rpc(service: string, method: string, body = {}): Promise<any> {
   return new Promise((resolve, reject) => clients[service][method](body, { deadline: Date.now() + 8000 }, (error: unknown, response: unknown) => error ? reject(error) : resolve(response)));
 }
