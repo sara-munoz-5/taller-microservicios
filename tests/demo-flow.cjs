@@ -1,4 +1,4 @@
-﻿// Run: node tests/demo-flow.cjs <path-to-playwright-package>
+// Run: node tests/demo-flow.cjs <path-to-playwright-package>
 const assert = require('node:assert/strict');
 const { chromium } = require(process.argv[2] || 'playwright');
 const base = process.env.TEST_BASE_URL || 'http://localhost:4321';

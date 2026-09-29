@@ -16,10 +16,8 @@ RUN bundle install
 COPY services/${SERVICE}/ ./
 COPY proto/ /proto/
 
-ENV RAILS_ENV=production
+ENV RAILS_ENV=development
 ENV CASSANDRA_HOST=cassandra
 ENV GRPC_PORT=50051
-
-EXPOSE 50051
 
 CMD ["bundle", "exec", "ruby", "bin/grpc_server"]

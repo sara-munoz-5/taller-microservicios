@@ -6,6 +6,13 @@ require "thread"
 class GrpcResilience
   TRANSIENT = [GRPC::Unavailable, GRPC::DeadlineExceeded].freeze
 
+  # Raised when the call was not executed: the circuit rejected it, the
+  # dependency was unreachable (UNAVAILABLE), or the deadline expired while the
+  # channel was never READY. A plain GRPC::Unavailable raised by this class
+  # means the call may have run. A dependency crashing mid-call can also look
+  # unreachable; that is the accepted residual risk of this classification.
+  class NotAttempted < GRPC::Unavailable; end
+
   def initialize(dependency:, timeout: ENV.fetch("GRPC_TIMEOUT_SECONDS", "1.0"),
                  threshold: ENV.fetch("GRPC_FAILURE_THRESHOLD", "3"),
                  recovery: ENV.fetch("GRPC_RECOVERY_SECONDS", "10"),
@@ -24,7 +31,9 @@ class GrpcResilience
     @state, @failures, @generation = :closed, 0, 0
   end
 
-  def call(operation:, read: false)
+  # connected: optional callable telling whether the channel is READY; when it
+  # is not, a deadline means the request never left this process.
+  def call(operation:, read: false, connected: nil)
     retries_left = read ? @retries : 0
     loop do
       generation, probe = acquire(operation)
@@ -33,7 +42,9 @@ class GrpcResilience
       rescue *TRANSIENT => error
         failed(generation, operation, error)
         # A half-open probe is always a single attempt. Writes never retry.
-        raise unavailable unless retries_left.positive? && !probe
+        unless retries_left.positive? && !probe
+          raise unavailable(possibly_executed?(error, connected) ? GRPC::Unavailable : NotAttempted)
+        end
         retries_left -= 1
         log("retry", operation: operation)
         @sleeper.call(@retry_delay)
@@ -51,6 +62,12 @@ class GrpcResilience
 
   private
 
+  # UNAVAILABLE means the dependency was unreachable. A deadline is ambiguous
+  # unless the channel never became READY.
+  def possibly_executed?(error, connected)
+    error.is_a?(GRPC::DeadlineExceeded) && (connected.nil? || connected.call)
+  end
+
   def acquire(operation)
     @mutex.synchronize do
       if @state == :open && @clock.call - @opened_at >= @recovery
@@ -60,7 +77,7 @@ class GrpcResilience
       end
       unless @state == :closed
         log("rejected", operation: operation, state: @state)
-        raise unavailable
+        raise unavailable(NotAttempted)
       end
       [@generation, false]
     end
@@ -88,8 +105,8 @@ class GrpcResilience
     end
   end
 
-  def unavailable
-    GRPC::Unavailable.new("El servicio de #{@dependency} no está disponible temporalmente. Intenta más tarde.")
+  def unavailable(error_class = GRPC::Unavailable)
+    error_class.new("El servicio de #{@dependency} no está disponible temporalmente. Intenta más tarde.")
   end
 
   def log(event, **fields)

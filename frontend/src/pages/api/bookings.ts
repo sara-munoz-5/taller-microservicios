@@ -1,4 +1,4 @@
-﻿import type { APIRoute } from 'astro';
+import type { APIRoute } from 'astro';
 import { rpc, session, sameOrigin, json, failure } from '../../lib/server';
 export const prerender = false;
 const summary = (booking: any) => ({ booking_code: booking.booking_code, status: booking.status, created_at: booking.created_at });

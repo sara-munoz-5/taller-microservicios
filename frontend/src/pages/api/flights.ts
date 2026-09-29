@@ -1,4 +1,4 @@
-﻿import type { APIRoute } from 'astro';
+import type { APIRoute } from 'astro';
 import { rpc, json, failure } from '../../lib/server';
 export const GET: APIRoute = async () => {
   try {

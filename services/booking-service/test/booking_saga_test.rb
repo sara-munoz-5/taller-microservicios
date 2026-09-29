@@ -1,4 +1,4 @@
-﻿require 'minitest/autorun'
+require 'minitest/autorun'
 require 'stringio'
 require 'ostruct'
 require_relative '../lib/booking_service_impl'

@@ -1,4 +1,4 @@
-﻿require 'minitest/autorun'
+require 'minitest/autorun'
 require 'stringio'
 require_relative '../lib/grpc_resilience'
 require_relative '../lib/flight_client'
@@ -45,6 +45,19 @@ class GrpcResilienceTest < Minitest::Test
     finish << true
     probe.value
     assert_raises(GRPC::Unavailable) { circuit.call(operation: 'read') { flunk 'failed probe did not reopen' } }
+  end
+
+  def test_rejection_is_distinguishable_from_ambiguous_failure
+    circuit = breaker(threshold: 1, retries: 0)
+    ambiguous = assert_raises(GRPC::Unavailable) { circuit.call(operation: 'ReleaseSeat') { raise GRPC::DeadlineExceeded.new('late') } }
+    refute_kind_of GrpcResilience::NotAttempted, ambiguous, 'a timeout may have executed'
+    unreachable = assert_raises(GRPC::Unavailable) do
+      breaker(threshold: 5, retries: 0).call(operation: 'ReleaseSeat') { raise GRPC::Unavailable.new('refused') }
+    end
+    assert_kind_of GrpcResilience::NotAttempted, unreachable
+    rejected = assert_raises(GRPC::Unavailable) { circuit.call(operation: 'ReleaseSeat') { flunk 'open circuit must not call' } }
+    assert_kind_of GrpcResilience::NotAttempted, rejected
+    assert_equal GRPC::Core::StatusCodes::UNAVAILABLE, rejected.code
   end
 
   def test_writes_never_retry_and_business_errors_do_not_open

@@ -1,4 +1,4 @@
-﻿import type { APIRoute } from 'astro';
+import type { APIRoute } from 'astro';
 import { rpc, setSession, clearSession, session, sameOrigin, json, failure } from '../../lib/server';
 export const prerender = false;
 export const GET: APIRoute = ({ cookies }) => {

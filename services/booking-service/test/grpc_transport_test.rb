@@ -16,6 +16,7 @@ class ResilienceFlightFixture < Aeroreserva::V1::FlightService::Service
     sleep 0.2 if @mode == :slow
     Aeroreserva::V1::Flight.new(id: 'fixture')
   end
+  alias release_seat get_flight
 end
 
 class GrpcTransportTest < Minitest::Test
@@ -26,7 +27,8 @@ class GrpcTransportTest < Minitest::Test
     @server.handle(@fixture)
     @thread = Thread.new { @server.run }
     @server.wait_till_running
-    @stub = Aeroreserva::V1::FlightService::Stub.new("127.0.0.1:#{port}", :this_channel_is_insecure)
+    @address = "127.0.0.1:#{port}"
+    @stub = Aeroreserva::V1::FlightService::Stub.new(@address, :this_channel_is_insecure)
   end
 
   def teardown
@@ -58,5 +60,26 @@ class GrpcTransportTest < Minitest::Test
     elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
     assert_operator elapsed, :<, 0.18
     assert_equal 1, @fixture.calls
+  end
+
+  # A stopped container is unresolvable: gRPC waits for a connection until the
+  # deadline. The request never left, so it must not look ambiguous.
+  def test_deadline_before_connecting_is_not_attempted
+    resilience = GrpcResilience.new(dependency: 'fixture', timeout: 0.3, retries: 0, logger: StringIO.new)
+    client = FlightClient.new(resilience: resilience, address: 'flight-service-stopped.invalid:50051')
+    assert_raises(GrpcResilience::NotAttempted) { client.release_seat('fixture') }
+  end
+
+  def test_deadline_after_connecting_is_ambiguous
+    resilience = GrpcResilience.new(dependency: 'fixture', timeout: 1, retries: 0, logger: StringIO.new)
+    client = FlightClient.new(resilience: resilience, address: @address)
+    @fixture.mode = :healthy
+    client.release_seat('fixture') # connect the channel
+    @fixture.mode = :slow
+    resilience = GrpcResilience.new(dependency: 'fixture', timeout: 0.03, retries: 0, logger: StringIO.new)
+    client.instance_variable_set(:@resilience, resilience)
+    error = assert_raises(GRPC::Unavailable) { client.release_seat('fixture') }
+    refute_kind_of GrpcResilience::NotAttempted, error, 'the server received the request'
+    assert_equal 2, @fixture.calls
   end
 end

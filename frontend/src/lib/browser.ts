@@ -1,4 +1,4 @@
-﻿export async function api(url: string, method = 'GET', body?: unknown) {
+export async function api(url: string, method = 'GET', body?: unknown) {
   const response = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
   const data = await response.json();
   if (response.status === 401) {

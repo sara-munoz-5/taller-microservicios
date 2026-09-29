@@ -1,4 +1,4 @@
-﻿import * as grpc from '@grpc/grpc-js';
+import * as grpc from '@grpc/grpc-js';
 import * as loader from '@grpc/proto-loader';
 import path from 'node:path';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -37,6 +37,9 @@ export function failure(error: any) {
     3: [400, 'Revisa los datos ingresados.'], 5: [404, 'No encontramos datos que coincidan.'],
     6: [409, 'Ese documento ya está registrado. Ingresa con su correo.'],
     9: [409, 'La operación ya no está disponible. Actualiza la página.'],
+    10: [409, 'El vuelo está recibiendo muchas solicitudes. Intenta de nuevo en unos segundos.'],
+    2: [503, 'El servicio no pudo completar la operación. Intenta de nuevo.'],
+    13: [500, 'No fue posible completar la operación. Revisa Mis reservas antes de intentar de nuevo.'],
     4: [503, 'El servicio tardó demasiado. Intenta de nuevo.'], 14: [503, 'El servicio no está disponible. Intenta de nuevo.'],
   };
   const [status, message] = error instanceof SyntaxError ? [400, 'La solicitud no es válida.'] : messages[error?.code] || [500, 'No pudimos completar la operación. Intenta de nuevo.'];
